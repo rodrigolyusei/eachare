@@ -8,7 +8,8 @@ import (
 
 func main() {
     x := strings.Split(os.Args[1], ":")
-    addr := x[0]
+
+	addr := x[0]
 	port := x[1]
 	neighbors := os.Args[2]
 	shared := os.Args[3]
