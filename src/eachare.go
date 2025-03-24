@@ -17,5 +17,5 @@ func main() {
 
 func getArgs(args []string) (string, string, string, string) {
 	x := strings.Split(args[1], ":")
-	return x[0], x[1], os.Args[2], os.Args[3]
+	return x[0], x[1], args[2], args[3]
 }
