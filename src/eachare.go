@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/rodrigolyusei/EACHare/src/commands"
 )
 
 func main() {
@@ -26,6 +28,10 @@ func main() {
 	fmt.Println("Porta:", port)
 	fmt.Println("Vizinhos:", neighbors)
 	fmt.Println("Diretório Compartilhado:", shared)
+
+	// Inicializa o servidor
+	comm := commands.GetCommand()
+	fmt.Println("Valor escolhido: " + comm)
 }
 
 func getArgs(args []string) (string, string, string, string) {
