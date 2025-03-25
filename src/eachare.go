@@ -19,6 +19,10 @@ type SelfArgs struct {
 	Shared    string
 }
 
+func (args SelfArgs) FullAddress() string {
+	return args.Address + ":" + args.Port
+}
+
 func check(err error) {
 	if err != nil {
 		log.Fatal(err)
@@ -26,13 +30,10 @@ func check(err error) {
 }
 
 func listen(args SelfArgs) {
-	port, err := number.GetNextPort()
+	ln, err := net.Listen("tcp", args.FullAddress())
 	check(err)
 
-	ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
-	check(err)
-
-	fmt.Println("Server running on port " + strconv.Itoa(port))
+	fmt.Println("Server running on port " + args.Port)
 	for {
 		go cliInterface()
 		conn, err := ln.Accept()
@@ -57,7 +58,7 @@ func handleConnection(conn net.Conn) {
 
 func cliInterface() {
 	for {
-		comm := commands.GetCommand()
+		comm := commands.GetCommands()
 		if comm == "2" {
 			var input string
 			fmt.Scanln(&input)
@@ -104,6 +105,15 @@ func getArgs(args []string) SelfArgs {
 func main() {
 	all_args := getArgs(os.Args)
 
+	var test = true
+	if test {
+		port, err := number.GetNextPort()
+		check(err)
+		all_args.Address = "127.0.0.1"
+		all_args.Port = "80" + strconv.Itoa(port)
+	}
+
+	commands.Address = all_args.Address
 	// Imprime os parâmetros de entrada
 	fmt.Println("Endereço:", all_args.Address)
 	fmt.Println("Porta:", all_args.Port)
