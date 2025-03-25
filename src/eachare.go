@@ -110,7 +110,7 @@ func main() {
 		port, err := number.GetNextPort()
 		check(err)
 		all_args.Address = "127.0.0.1"
-		all_args.Port = "80" + strconv.Itoa(port)
+		all_args.Port = strconv.Itoa(port)
 	}
 
 	commands.Address = all_args.Address
