@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"EACHare/src/peers"
 	"fmt"
 	"io/fs"
 	"net"
@@ -25,6 +26,7 @@ func sendMessage(connection net.Conn, message BaseMessage) error {
 
 func check(e error) {
 	if e != nil {
+		_ = fmt.Errorf("Error: %s", e)
 		panic(e)
 	}
 }
@@ -43,6 +45,7 @@ func GetCommands() string {
 	return x
 }
 
-func GetPeers() {
+func GetPeers(knowPeers []peers.Peer) {
+	//baseMessage := BaseMessage{Clock: 0, Type: "GET_PEERS", Arguments: nil}
 
 }

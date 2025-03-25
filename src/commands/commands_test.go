@@ -31,3 +31,22 @@ func TestGetSharedDirectory(t *testing.T) {
 		t.Errorf("Expected first entry to be 'loren.txt', got %s", entries[0].Name())
 	}
 }
+
+func TestSendMessage(t *testing.T) {
+	conn := &mockConn{}
+	message := BaseMessage{
+		Clock:     1,
+		Type:      "TEST",
+		Arguments: []string{"arg1", "arg2"},
+	}
+
+	err := sendMessage(conn, message)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	expected := "localhost 1 TEST arg1 arg2"
+	if string(conn.data) != expected {
+		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
+	}
+}
