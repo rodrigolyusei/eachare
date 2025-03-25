@@ -32,7 +32,7 @@ func TestGetSharedDirectory(t *testing.T) {
 	}
 }
 
-func TestSendMessage(t *testing.T) {
+func TestSendMessageWithArguments(t *testing.T) {
 	conn := &mockConn{}
 	message := BaseMessage{
 		Clock:     1,
@@ -46,6 +46,25 @@ func TestSendMessage(t *testing.T) {
 	}
 
 	expected := "localhost 1 TEST arg1 arg2"
+	if string(conn.data) != expected {
+		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
+	}
+}
+
+func TestSendMessageArgumentsNil(t *testing.T) {
+	conn := &mockConn{}
+	message := BaseMessage{
+		Clock:     1,
+		Type:      "TEST",
+		Arguments: nil,
+	}
+
+	err := sendMessage(conn, message)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	expected := "localhost 1 TEST"
 	if string(conn.data) != expected {
 		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
 	}
