@@ -5,18 +5,23 @@ import (
 	"io/fs"
 	"net"
 	"os"
+	"strings"
 )
 
 type BaseMessage struct {
-	Origin string
-	Clock  int
-	Type   string
+	Origin    string
+	Clock     int
+	Type      string
+	Arguments []string
 }
 
 var Address string = "localhost"
 
-func sendMessage(connection net.Conn, message BaseMessage) {
-
+func sendMessage(connection net.Conn, message BaseMessage) error {
+	arguments := strings.Join(message.Arguments, " ")
+	messageStr := fmt.Sprintf("%s %d %s %s", message.Origin, message.Clock, message.Type, arguments)
+	_, err := connection.Write([]byte(messageStr))
+	return err
 }
 
 func check(e error) {
