@@ -1,7 +1,7 @@
 package number
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -9,9 +9,13 @@ import (
 
 func GetNextPort() (int, error) {
 	number, err := UpdateAndGetNumberFromFile()
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	port, err := strconv.Atoi("80" + strconv.Itoa(number))
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	return port, nil
 }
 
@@ -32,7 +36,7 @@ func UpdateAndGetNumberFromFile() (int, error) {
 }
 
 func updateNumberInFile(filename string) error {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -47,12 +51,12 @@ func updateNumberInFile(filename string) error {
 	number++
 
 	// Write the updated number back to the file
-	return ioutil.WriteFile(filename, []byte(strconv.Itoa(number)), 0644)
+	return os.WriteFile(filename, []byte(strconv.Itoa(number)), 0644)
 }
 
 func getNumberFromFile(filename string) (int, error) {
 	// Read the number from the file
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return 0, err
 	}

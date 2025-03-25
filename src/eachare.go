@@ -2,21 +2,21 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"strings"
 	"log"
 	"net"
+	"os"
 	"strconv"
+	"strings"
 
-	"github.com/rodrigolyusei/EACHare/src/commands"
-	"github.com/rodrigolyusei/EACHare/src/number"
+	"EACHare/src/commands"
+	"EACHare/src/number"
 )
 
 type SelfArgs struct {
-	Address 	string
-	Port		string
-	Neighbors 	string
-	Shared		string
+	Address   string
+	Port      string
+	Neighbors string
+	Shared    string
 }
 
 func check(err error) {
@@ -25,22 +25,7 @@ func check(err error) {
 	}
 }
 
-func main() {
-	all_args := getArgs(os.Args)
-
-	// Imprime os parâmetros de entrada
-	fmt.Println("Endereço:", all_args.Address)
-	fmt.Println("Porta:", all_args.Port)
-	fmt.Println("Vizinhos:", all_args.Neighbors)
-	fmt.Println("Diretório Compartilhado:", all_args.Shared)
-	
-	// Inicializa o servidor
-	// comm := commands.GetCommand()
-	// fmt.Println("Valor escolhido: " + comm)
-	listen(all_args)
-}
-
-func listen(args SelfArgs){
+func listen(args SelfArgs) {
 	port, err := number.GetNextPort()
 	check(err)
 
@@ -76,15 +61,14 @@ func cliInterface() {
 		if comm == "2" {
 			var input string
 			fmt.Scanln(&input)
-			
+
 			number, err := strconv.Atoi(input)
 			if err != nil {
 				fmt.Println("Error casting port to int! Did you write a number?")
 				continue
-			}			
+			}
 			go client(number)
 		}
-		
 	}
 }
 
@@ -102,7 +86,7 @@ func client(port int) {
 	}
 }
 
-func getArgs(args []string) (SelfArgs) {
+func getArgs(args []string) SelfArgs {
 	if len(args) != 4 {
 		fmt.Println("Parâmetros de entrada inválidos, por favor, siga o formato abaixo:")
 		fmt.Println("./eachare <endereço>:<porta> <vizinhos> <diretório compartilhado>")
@@ -114,5 +98,20 @@ func getArgs(args []string) (SelfArgs) {
 	}
 
 	x := strings.Split(args[1], ":")
-	return SelfArgs{Address:x[0], Port:x[1], Neighbors:args[2], Shared:args[3]}
+	return SelfArgs{Address: x[0], Port: x[1], Neighbors: args[2], Shared: args[3]}
+}
+
+func main() {
+	all_args := getArgs(os.Args)
+
+	// Imprime os parâmetros de entrada
+	fmt.Println("Endereço:", all_args.Address)
+	fmt.Println("Porta:", all_args.Port)
+	fmt.Println("Vizinhos:", all_args.Neighbors)
+	fmt.Println("Diretório Compartilhado:", all_args.Shared)
+
+	// Inicializa o servidor
+	// comm := commands.GetCommand()
+	// fmt.Println("Valor escolhido: " + comm)
+	listen(all_args)
 }
