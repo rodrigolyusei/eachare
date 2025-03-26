@@ -90,7 +90,7 @@ func PeerListReceive(baseMessage BaseMessage) []peers.Peer {
 
 	newPeers := make([]peers.Peer, peersCount)
 
-	for i := 0; i < peersCount; i++ {
+	for i := range peersCount {
 		subMessage := strings.Split(baseMessage.Arguments[1+i], ":")
 		peer := peers.Peer{Address: subMessage[0], Port: subMessage[1], Status: peers.GetPeerStatus(subMessage[2])}
 		newPeers[i] = peer

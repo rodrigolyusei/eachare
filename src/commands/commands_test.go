@@ -73,3 +73,59 @@ func TestSendMessageArgumentsNil(t *testing.T) {
 		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
 	}
 }
+
+func TestPeerListReceive(t *testing.T) {
+	message := BaseMessage{
+		Clock:     0,
+		Type:      PEER_LIST,
+		Arguments: []string{"2", "127.0.0.1:9002:ONLINE:3", "127.0.0.1:9004:ONLINE:0"},
+	}
+
+	expected := []string{"127.0.0.1:9002", "127.0.0.1:9004"}
+
+	receivePeers := PeerListReceive(message)
+
+	for i, peer := range receivePeers {
+		if peer.FullAddress() != expected[i] {
+			t.Fatalf("Expected %s, got %s", message.Arguments[i], peer.FullAddress())
+		}
+		if peer.Status != peers.ONLINE {
+			t.Fatalf("Expected ONLINE, got %s", peer.Status)
+		}
+	}
+}
+
+func TestPeerListReceiveOffline(t *testing.T) {
+	message := BaseMessage{
+		Clock:     0,
+		Type:      PEER_LIST,
+		Arguments: []string{"1", "127.0.0.1:9002:OFFLINE:3"},
+	}
+
+	expected := "127.0.0.1:9002"
+
+	receivePeers := PeerListReceive(message)
+
+	for i, peer := range receivePeers {
+		if peer.FullAddress() != expected {
+			t.Fatalf("Expected %s, got %s", message.Arguments[i], peer.FullAddress())
+		}
+		if peer.Status != peers.OFFLINE {
+			t.Fatalf("Expected OFFLINE, got %s", peer.Status)
+		}
+	}
+}
+
+func TestPeerListReceiveArgumentsNil(t *testing.T) {
+	message := BaseMessage{
+		Clock:     0,
+		Type:      PEER_LIST,
+		Arguments: []string{"0"},
+	}
+
+	peers := PeerListReceive(message)
+
+	if len(peers) != 0 {
+		t.Fatalf("Expected 0 peers, got %d", len(peers))
+	}
+}

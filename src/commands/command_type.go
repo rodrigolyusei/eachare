@@ -5,6 +5,7 @@ type CommandType uint8
 const (
 	UNKNOWN CommandType = iota
 	GET_PEERS
+	PEER_LIST
 )
 
 func (ct CommandType) String() string {

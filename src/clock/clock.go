@@ -13,3 +13,7 @@ func UpdateClock() int {
 func ResetClock() {
 	clock = 0
 }
+
+func GetClock() int {
+	return clock
+}
