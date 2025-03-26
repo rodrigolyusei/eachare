@@ -36,7 +36,7 @@ func TestSendMessageWithArguments(t *testing.T) {
 	conn := &mockConn{}
 	message := BaseMessage{
 		Clock:     1,
-		Type:      "TEST",
+		Type:      0,
 		Arguments: []string{"arg1", "arg2"},
 	}
 
@@ -55,7 +55,7 @@ func TestSendMessageArgumentsNil(t *testing.T) {
 	conn := &mockConn{}
 	message := BaseMessage{
 		Clock:     1,
-		Type:      "TEST",
+		Type:      0,
 		Arguments: nil,
 	}
 

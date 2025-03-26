@@ -11,7 +11,7 @@ import (
 
 type BaseMessage struct {
 	Clock     int
-	Type      string
+	Type      CommandType
 	Arguments []string
 }
 
@@ -49,6 +49,6 @@ func GetCommands() string {
 }
 
 func GetPeers(knowPeers []peers.Peer) {
-	//baseMessage := BaseMessage{Clock: 0, Type: "GET_PEERS", Arguments: nil}
+	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
 
 }
