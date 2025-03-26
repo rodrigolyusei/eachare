@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"EACHare/src/peers"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"EACHare/src/clock"
+	"EACHare/src/peers"
 )
 
 type BaseMessage struct {
