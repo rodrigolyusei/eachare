@@ -192,3 +192,19 @@ func TestGetPeersResponse(t *testing.T) {
 	}
 
 }
+
+func TestGetPeersRequest(t *testing.T) {
+	// Mock peers
+	knowPeers := []peers.Peer{
+		{Address: "127.0.0.1", Port: "8080", Status: true},
+		{Address: "127.0.0.2", Port: "8081", Status: true},
+	}
+
+	GetPeersRequest(knowPeers)
+
+	for _, peer := range knowPeers {
+		if peer.Status {
+			t.Errorf("Expected peer status to be false, got true")
+		}
+	}
+}

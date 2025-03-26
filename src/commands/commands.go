@@ -2,6 +2,7 @@ package commands
 
 import (
 	"EACHare/src/peers"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
@@ -29,6 +30,10 @@ func sendMessage(connection net.Conn, message BaseMessage, receiverAddress strin
 	}
 	messageStr := fmt.Sprintf("%s %d %s%s", Address, message.Clock, message.Type.String(), arguments)
 	fmt.Printf("\tEncaminhando mensagem \"%s\" para %s\n", messageStr, receiverAddress)
+
+	if connection == nil {
+		return errors.New("Connection is nil")
+	}
 	_, err := connection.Write([]byte(messageStr))
 	return err
 }
@@ -73,7 +78,7 @@ func GetCommands() string {
 	return x
 }
 
-func GetPeersSend(knowPeers []peers.Peer) {
+func GetPeersRequest(knowPeers []peers.Peer) {
 	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
 	for i, peer := range knowPeers {
 		conn, err := net.Dial("tcp", peer.FullAddress())
