@@ -58,6 +58,8 @@ func handleConnection(conn net.Conn) {
 
 	message := commands.ReceiveMessage(string(buf))
 
+	knowPeers[message.Origin] = peers.ONLINE
+
 	switch message.Type {
 	case commands.GET_PEERS:
 		commands.GetPeersResponse(conn, message, knowPeers)
