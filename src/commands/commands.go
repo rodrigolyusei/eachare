@@ -24,7 +24,6 @@ var Address string = "localhost"
 
 func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
 	conn, err := net.Dial("tcp", receiverAddress)
-
 	message.Clock = clock.UpdateClock()
 	arguments := ""
 	if message.Arguments != nil {
@@ -36,6 +35,7 @@ func sendMessage(connection net.Conn, message BaseMessage, receiverAddress strin
 	if conn == nil {
 		return errors.New("Connection is nil")
 	}
+	defer conn.Close()
 	_, err = conn.Write([]byte(messageStr))
 	return err
 }
