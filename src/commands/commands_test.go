@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"EACHare/src/clock"
+	"EACHare/src/peers"
 	"os"
 	"testing"
 )
@@ -33,38 +35,40 @@ func TestGetSharedDirectory(t *testing.T) {
 }
 
 func TestSendMessageWithArguments(t *testing.T) {
+	clock.ResetClock()
 	conn := &mockConn{}
 	message := BaseMessage{
-		Clock:     1,
-		Type:      0,
+		Clock:     0,
+		Type:      UNKNOWN,
 		Arguments: []string{"arg1", "arg2"},
 	}
 
-	err := sendMessage(conn, message)
+	err := sendMessage(conn, message, peers.Peer{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	expected := "localhost 1 TEST arg1 arg2"
+	expected := "localhost 1 UNKNOWN arg1 arg2"
 	if string(conn.data) != expected {
 		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
 	}
 }
 
 func TestSendMessageArgumentsNil(t *testing.T) {
+	clock.ResetClock()
 	conn := &mockConn{}
 	message := BaseMessage{
-		Clock:     1,
-		Type:      0,
+		Clock:     0,
+		Type:      UNKNOWN,
 		Arguments: nil,
 	}
 
-	err := sendMessage(conn, message)
+	err := sendMessage(conn, message, peers.Peer{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	expected := "localhost 1 TEST"
+	expected := "localhost 1 UNKNOWN"
 	if string(conn.data) != expected {
 		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
 	}

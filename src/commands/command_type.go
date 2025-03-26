@@ -3,7 +3,8 @@ package commands
 type CommandType uint8
 
 const (
-	GET_PEERS CommandType = iota
+	UNKNOWN CommandType = iota
+	GET_PEERS
 )
 
 func (ct CommandType) String() string {
@@ -13,4 +14,12 @@ func (ct CommandType) String() string {
 	}
 
 	return "UNKNOWN"
+}
+
+func GetCommandType(s string) CommandType {
+	switch s {
+	case "GET_PEERS":
+		return GET_PEERS
+	}
+	return 0
 }
