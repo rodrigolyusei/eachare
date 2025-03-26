@@ -38,7 +38,7 @@ func sendMessage(connection net.Conn, message BaseMessage, receiverAddress strin
 	return err
 }
 
-func receiveMessage(message string) BaseMessage {
+func ReceiveMessage(message string) BaseMessage {
 	messageParts := strings.Split(message, " ")
 	receivedClock, err := strconv.Atoi(messageParts[1])
 	if err != nil {

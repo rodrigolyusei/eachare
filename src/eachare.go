@@ -10,6 +10,7 @@ import (
 
 	"EACHare/src/commands"
 	"EACHare/src/number"
+	"EACHare/src/peers"
 )
 
 type SelfArgs struct {
@@ -18,6 +19,8 @@ type SelfArgs struct {
 	Neighbors string
 	Shared    string
 }
+
+var knowPeers = []peers.Peer{}
 
 func (args SelfArgs) FullAddress() string {
 	return args.Address + ":" + args.Port
@@ -53,22 +56,31 @@ func handleConnection(conn net.Conn) {
 	_, err := conn.Read(buf)
 	check(err)
 
-	fmt.Printf("Received: %s", buf)
+	message := commands.ReceiveMessage(string(buf))
+
+	switch message.Type {
+	case commands.GET_PEERS:
+		commands.GetPeersResponse(conn, message, knowPeers)
+	case commands.PEER_LIST:
+		newPeers := commands.PeerListReceive(message)
+		commands.UpdatePeersList(knowPeers, newPeers)
+	}
 }
 
 func cliInterface() {
 	for {
 		comm := commands.GetCommands()
 		if comm == "2" {
-			var input string
-			fmt.Scanln(&input)
+			// var input string
+			// fmt.Scanln(&input)
 
-			number, err := strconv.Atoi(input)
-			if err != nil {
-				fmt.Println("Error casting port to int! Did you write a number?")
-				continue
-			}
-			go client(number)
+			// number, err := strconv.Atoi(input)
+			// if err != nil {
+			// 	fmt.Println("Error casting port to int! Did you write a number?")
+			// 	continue
+			// }
+			// go client(number)
+			commands.GetPeersRequest(knowPeers)
 		}
 	}
 }
@@ -111,6 +123,16 @@ func main() {
 		check(err)
 		all_args.Address = "127.0.0.1"
 		all_args.Port = strconv.Itoa(port)
+	}
+
+	port, err := strconv.Atoi(all_args.Port)
+	check(err)
+	if port%2 == 0 {
+		knowPeers = append(knowPeers, []peers.Peer{{Address: "127.0.0.1", Port: strconv.Itoa(port + 1), Status: peers.ONLINE},
+			{Address: "127.0.0.1", Port: strconv.Itoa(port + 2), Status: peers.OFFLINE}}...)
+	} else {
+		knowPeers = append(knowPeers, []peers.Peer{{Address: "127.0.0.1", Port: strconv.Itoa(port + 1), Status: peers.OFFLINE},
+			{Address: "127.0.0.1", Port: strconv.Itoa(port + 3), Status: peers.ONLINE}}...)
 	}
 
 	commands.Address = all_args.Address
