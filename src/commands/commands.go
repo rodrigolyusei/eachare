@@ -21,14 +21,14 @@ type BaseMessage struct {
 
 var Address string = "localhost"
 
-func sendMessage(connection net.Conn, message BaseMessage, peer peers.Peer) error {
+func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
 	message.Clock = clock.UpdateClock()
 	arguments := ""
 	if message.Arguments != nil {
 		arguments = " " + strings.Join(message.Arguments, " ")
 	}
 	messageStr := fmt.Sprintf("%s %d %s%s", Address, message.Clock, message.Type.String(), arguments)
-	fmt.Printf("\tEncaminhando mensagem \"%s\" para %s\n", messageStr, peer.FullAddress())
+	fmt.Printf("\tEncaminhando mensagem \"%s\" para %s\n", messageStr, receiverAddress)
 	_, err := connection.Write([]byte(messageStr))
 	return err
 }
@@ -77,11 +77,25 @@ func GetPeersSend(knowPeers []peers.Peer) {
 	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
 	for i, peer := range knowPeers {
 		conn, err := net.Dial("tcp", peer.FullAddress())
-		err = sendMessage(conn, baseMessage, peer)
+		err = sendMessage(conn, baseMessage, peer.FullAddress())
 		if err != nil {
 			knowPeers[i].Status = false
 		}
 	}
+}
+
+func GetPeersResponse(conn net.Conn, receivedMessage BaseMessage, knowPeers []peers.Peer) {
+
+	peers := []string{}
+	for _, peer := range knowPeers {
+		peers = append(peers, peer.Address+":"+peer.Port+":"+peer.Status.String()+":"+"0")
+	}
+
+	arguments := append([]string{strconv.Itoa(len(knowPeers))}, peers...)
+
+	dropMessage := BaseMessage{Origin: Address, Clock: 0, Type: PEER_LIST, Arguments: arguments}
+
+	sendMessage(conn, dropMessage, receivedMessage.Origin)
 }
 
 func PeerListReceive(baseMessage BaseMessage) []peers.Peer {
@@ -97,4 +111,21 @@ func PeerListReceive(baseMessage BaseMessage) []peers.Peer {
 	}
 
 	return newPeers
+}
+
+func UpdatePeersList(knowPeers []peers.Peer, newPeers []peers.Peer) []peers.Peer {
+	for _, newPeer := range newPeers {
+		peerFound := false
+		for i, knowPeer := range knowPeers {
+			if newPeer.FullAddress() == knowPeer.FullAddress() {
+				knowPeers[i].Status = newPeer.Status
+				peerFound = true
+				break
+			}
+		}
+		if !peerFound {
+			knowPeers = append(knowPeers, newPeer)
+		}
+	}
+	return knowPeers
 }

@@ -12,6 +12,8 @@ func (ct CommandType) String() string {
 	switch ct {
 	case GET_PEERS:
 		return "GET_PEERS"
+	case PEER_LIST:
+		return "PEER_LIST"
 	}
 
 	return "UNKNOWN"
