@@ -23,6 +23,8 @@ type BaseMessage struct {
 var Address string = "localhost"
 
 func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
+	conn, err := net.Dial("tcp", receiverAddress)
+
 	message.Clock = clock.UpdateClock()
 	arguments := ""
 	if message.Arguments != nil {
@@ -31,10 +33,10 @@ func sendMessage(connection net.Conn, message BaseMessage, receiverAddress strin
 	messageStr := fmt.Sprintf("%s %d %s%s", Address, message.Clock, message.Type.String(), arguments)
 	fmt.Printf("\tEncaminhando mensagem \"%s\" para %s\n", messageStr, receiverAddress)
 
-	if connection == nil {
+	if conn == nil {
 		return errors.New("Connection is nil")
 	}
-	_, err := connection.Write([]byte(messageStr))
+	_, err = conn.Write([]byte(messageStr))
 	return err
 }
 
@@ -45,7 +47,11 @@ func ReceiveMessage(message string) BaseMessage {
 		panic(err)
 	}
 
-	fmt.Println("\t Resposta recebida: " + message)
+	answer := []string{messageParts[0], strconv.Itoa(receivedClock), GetCommandType(messageParts[2]).String()}
+	answer = append(answer, messageParts[3:]...)
+	receive := strings.Join(answer, " ")
+
+	fmt.Println("\t Resposta recebida: \"" + receive + "\"")
 
 	clock.UpdateClock()
 
@@ -74,26 +80,30 @@ func GetSharedDirectory(sharedPath string) []fs.DirEntry {
 func GetCommands() string {
 	fmt.Println("Escolha um comando:\n\t[1] Listar peers\n\t[2] Obter peers\n\t[3] Listar arquivos locais\n\t[4] Buscar arquivos\n\t[5] Exibir estatisticas\n\t[6] Alterar tamanho de chunk\n\t[9] Sair")
 	var x string
+	fmt.Print("> ")
 	fmt.Scanln(&x)
 	return x
 }
 
-func GetPeersRequest(knowPeers []peers.Peer) {
+func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
 	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
-	for i, peer := range knowPeers {
-		conn, err := net.Dial("tcp", peer.FullAddress())
-		err = sendMessage(conn, baseMessage, peer.FullAddress())
+	for addressPort, _ := range knowPeers {
+		fmt.Println("Enviando mensagem para ", addressPort)
+		conn, err := net.Dial("tcp", addressPort)
+		err = sendMessage(conn, baseMessage, addressPort)
 		if err != nil {
-			knowPeers[i].Status = false
+			knowPeers[addressPort] = peers.OFFLINE
+		} else {
+			knowPeers[addressPort] = peers.ONLINE
 		}
 	}
 }
 
-func GetPeersResponse(conn net.Conn, receivedMessage BaseMessage, knowPeers []peers.Peer) {
-
+func GetPeersResponse(conn net.Conn, receivedMessage BaseMessage, knowPeers map[string]peers.PeerStatus) {
+	//fmt.Print("Preparando get Peersresponse...")
 	peers := []string{}
-	for _, peer := range knowPeers {
-		peers = append(peers, peer.Address+":"+peer.Port+":"+peer.Status.String()+":"+"0")
+	for addressPort, peerStatus := range knowPeers {
+		peers = append(peers, addressPort+":"+peerStatus.String()+":"+"0")
 	}
 
 	arguments := append([]string{strconv.Itoa(len(knowPeers))}, peers...)
@@ -118,19 +128,37 @@ func PeerListReceive(baseMessage BaseMessage) []peers.Peer {
 	return newPeers
 }
 
-func UpdatePeersList(knowPeers []peers.Peer, newPeers []peers.Peer) []peers.Peer {
-	for _, newPeer := range newPeers {
-		peerFound := false
-		for i, knowPeer := range knowPeers {
-			if newPeer.FullAddress() == knowPeer.FullAddress() {
-				knowPeers[i].Status = newPeer.Status
-				peerFound = true
-				break
-			}
+func ListPeers(knowPeers map[string]peers.PeerStatus) {
+	fmt.Println("Lista de peers: ")
+	fmt.Println("\t[0] voltar para o menu anterior")
+	counter := 0
+	for addressPort, peerStatus := range knowPeers {
+		counter++
+		fmt.Println("\t[" + strconv.Itoa(counter) + "] " + addressPort + " " + peerStatus.String())
+	}
+
+	var input string
+
+	for {
+		fmt.Print("> ")
+		fmt.Scanln(&input)
+		number, err := strconv.Atoi(input)
+		if err != nil || number != 0 {
+			fmt.Print("Inválido!\n")
+			continue
+		} else {
+			break
 		}
-		if !peerFound {
-			knowPeers = append(knowPeers, newPeer)
+
+	}
+
+}
+
+func UpdatePeersMap(knowPeers map[string]peers.PeerStatus, newPeers []peers.Peer) {
+	for _, newPeer := range newPeers {
+		_, exists := knowPeers[newPeer.FullAddress()]
+		if !exists {
+			knowPeers[newPeer.FullAddress()] = newPeer.Status
 		}
 	}
-	return knowPeers
 }

@@ -20,7 +20,7 @@ type SelfArgs struct {
 	Shared    string
 }
 
-var knowPeers = []peers.Peer{}
+var knowPeers = make(map[string]peers.PeerStatus)
 
 func (args SelfArgs) FullAddress() string {
 	return args.Address + ":" + args.Port
@@ -35,10 +35,10 @@ func check(err error) {
 func listen(args SelfArgs) {
 	ln, err := net.Listen("tcp", args.FullAddress())
 	check(err)
+	go cliInterface()
 
 	fmt.Println("Server running on port " + args.Port)
 	for {
-		go cliInterface()
 		conn, err := ln.Accept()
 		if err != nil {
 			fmt.Println(err)
@@ -63,14 +63,16 @@ func handleConnection(conn net.Conn) {
 		commands.GetPeersResponse(conn, message, knowPeers)
 	case commands.PEER_LIST:
 		newPeers := commands.PeerListReceive(message)
-		commands.UpdatePeersList(knowPeers, newPeers)
+		commands.UpdatePeersMap(knowPeers, newPeers)
 	}
 }
 
 func cliInterface() {
 	for {
 		comm := commands.GetCommands()
-		if comm == "2" {
+		if comm == "1" {
+			commands.ListPeers(knowPeers)
+		} else if comm == "2" {
 			// var input string
 			// fmt.Scanln(&input)
 
@@ -82,6 +84,7 @@ func cliInterface() {
 			// go client(number)
 			commands.GetPeersRequest(knowPeers)
 		}
+		fmt.Println()
 	}
 }
 
@@ -128,14 +131,14 @@ func main() {
 	port, err := strconv.Atoi(all_args.Port)
 	check(err)
 	if port%2 == 0 {
-		knowPeers = append(knowPeers, []peers.Peer{{Address: "127.0.0.1", Port: strconv.Itoa(port + 1), Status: peers.ONLINE},
-			{Address: "127.0.0.1", Port: strconv.Itoa(port + 2), Status: peers.OFFLINE}}...)
+		knowPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
+		knowPeers["127.0.0.1:"+strconv.Itoa(port+2)] = peers.OFFLINE
 	} else {
-		knowPeers = append(knowPeers, []peers.Peer{{Address: "127.0.0.1", Port: strconv.Itoa(port + 1), Status: peers.OFFLINE},
-			{Address: "127.0.0.1", Port: strconv.Itoa(port + 3), Status: peers.ONLINE}}...)
+		knowPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
+		knowPeers["127.0.0.1:"+strconv.Itoa(port+3)] = peers.OFFLINE
 	}
 
-	commands.Address = all_args.Address
+	commands.Address = all_args.Address + ":" + all_args.Port
 	// Imprime os parâmetros de entrada
 	fmt.Println("Endereço:", all_args.Address)
 	fmt.Println("Porta:", all_args.Port)
