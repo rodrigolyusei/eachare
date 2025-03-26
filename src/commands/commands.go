@@ -33,6 +33,25 @@ func sendMessage(connection net.Conn, message BaseMessage, peer peers.Peer) erro
 	return err
 }
 
+func receiveMessage(message string) BaseMessage {
+	messageParts := strings.Split(message, " ")
+	receivedClock, err := strconv.Atoi(messageParts[1])
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("\t Resposta recebida: " + message)
+
+	clock.UpdateClock()
+
+	return BaseMessage{
+		Origin:    messageParts[0],
+		Clock:     receivedClock,
+		Type:      GetCommandType(messageParts[2]),
+		Arguments: messageParts[3:],
+	}
+}
+
 func check(e error) {
 	if e != nil {
 		_ = fmt.Errorf("Error: %s", e)
@@ -65,21 +84,17 @@ func GetPeersSend(knowPeers []peers.Peer) {
 	}
 }
 
-func GetPeersReceive(connection net.Conn) {
+func PeerListReceive(baseMessage BaseMessage) []peers.Peer {
+	peersCount, err := strconv.Atoi(baseMessage.Arguments[0])
+	check(err)
 
-}
+	newPeers := make([]peers.Peer, peersCount)
 
-func receiveMessage(message string) BaseMessage {
-	messageParts := strings.Split(message, " ")
-	clock, err := strconv.Atoi(messageParts[1])
-	if err != nil {
-		panic(err)
+	for i := 0; i < peersCount; i++ {
+		subMessage := strings.Split(baseMessage.Arguments[1+i], ":")
+		peer := peers.Peer{Address: subMessage[0], Port: subMessage[1], Status: peers.GetPeerStatus(subMessage[2])}
+		newPeers[i] = peer
 	}
 
-	return BaseMessage{
-		Origin:    messageParts[0],
-		Clock:     clock,
-		Type:      GetCommandType(messageParts[2]),
-		Arguments: messageParts[3:],
-	}
+	return newPeers
 }
