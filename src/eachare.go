@@ -19,10 +19,6 @@ type SelfArgs struct {
 	Shared    string
 }
 
-func (args SelfArgs) FullAddress() string {
-	return args.Address + ":" + args.Port
-}
-
 func check(err error) {
 	if err != nil {
 		log.Fatal(err)
@@ -30,12 +26,15 @@ func check(err error) {
 }
 
 func listen(args SelfArgs) {
-	ln, err := net.Listen("tcp", args.FullAddress())
+	port, err := number.GetNextPort()
 	check(err)
 
-	fmt.Println("Server running on port " + args.Port)
+	ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+	check(err)
+
+	fmt.Println("Server running on port " + strconv.Itoa(port))
 	for {
-		go cliInterface()
+		go cliInterface(args)
 		conn, err := ln.Accept()
 		if err != nil {
 			fmt.Println(err)
@@ -56,7 +55,7 @@ func handleConnection(conn net.Conn) {
 	fmt.Printf("Received: %s", buf)
 }
 
-func cliInterface() {
+func cliInterface(args SelfArgs) {
 	for {
 		comm := commands.GetCommands()
 		if comm == "2" {
@@ -69,6 +68,14 @@ func cliInterface() {
 				continue
 			}
 			go client(number)
+		}
+		if comm == "3" {
+			shared := commands.GetSharedDirectory(args.Shared)
+			fmt.Println(shared)
+		}
+		if comm == "9" {
+			fmt.Println("Saindo...")
+			return
 		}
 	}
 }
@@ -103,17 +110,9 @@ func getArgs(args []string) SelfArgs {
 }
 
 func main() {
+	// Pega os argumentos de entrada
 	all_args := getArgs(os.Args)
 
-	var test = true
-	if test {
-		port, err := number.GetNextPort()
-		check(err)
-		all_args.Address = "127.0.0.1"
-		all_args.Port = strconv.Itoa(port)
-	}
-
-	commands.Address = all_args.Address
 	// Imprime os parâmetros de entrada
 	fmt.Println("Endereço:", all_args.Address)
 	fmt.Println("Porta:", all_args.Port)
@@ -121,7 +120,5 @@ func main() {
 	fmt.Println("Diretório Compartilhado:", all_args.Shared)
 
 	// Inicializa o servidor
-	// comm := commands.GetCommand()
-	// fmt.Println("Valor escolhido: " + comm)
 	listen(all_args)
 }

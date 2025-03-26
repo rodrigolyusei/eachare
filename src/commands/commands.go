@@ -1,12 +1,13 @@
 package commands
 
 import (
-	"EACHare/src/peers"
 	"fmt"
 	"io/fs"
 	"net"
 	"os"
 	"strings"
+
+	"EACHare/src/peers"
 )
 
 type BaseMessage struct {
