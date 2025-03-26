@@ -102,11 +102,17 @@ func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
 func GetPeersResponse(conn net.Conn, receivedMessage BaseMessage, knowPeers map[string]peers.PeerStatus) {
 	//fmt.Print("Preparando get Peersresponse...")
 	peers := []string{}
+
+	size := 0
 	for addressPort, peerStatus := range knowPeers {
+		if addressPort == receivedMessage.Origin {
+			continue
+		}
+		size++
 		peers = append(peers, addressPort+":"+peerStatus.String()+":"+"0")
 	}
 
-	arguments := append([]string{strconv.Itoa(len(knowPeers))}, peers...)
+	arguments := append([]string{strconv.Itoa(size)}, peers...)
 
 	dropMessage := BaseMessage{Origin: Address, Clock: 0, Type: PEER_LIST, Arguments: arguments}
 

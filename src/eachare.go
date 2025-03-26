@@ -147,8 +147,6 @@ func main() {
 	}
 
 	commands.Address = all_args.Address + ":" + all_args.Port
-
-	commands.Address = all_args.Address
 	// Imprime os parâmetros de entrada
 	fmt.Println("Endereço:", all_args.Address)
 	fmt.Println("Porta:", all_args.Port)
