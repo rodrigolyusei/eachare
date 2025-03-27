@@ -51,7 +51,11 @@ func ReceiveMessage(message string) BaseMessage {
 	answer = append(answer, messageParts[3:]...)
 	receive := strings.Join(answer, " ")
 
-	fmt.Println("\t Resposta recebida: \"" + receive + "\"")
+	if strings.Trim(messageParts[2], "\x00") == "HELLO" {
+		fmt.Println("\tMensagem recebida: \"" + receive + "\"")
+	} else {
+		fmt.Println("\tResposta recebida: \"" + receive + "\"")
+	}
 
 	clock.UpdateClock()
 
@@ -172,6 +176,7 @@ func ListPeers(knowPeers map[string]peers.PeerStatus) {
 				knowPeers[addrList[number-1]] = peers.ONLINE
 				fmt.Println("\tAtualizando peer " + addrList[number-1] + " status ONLINE")
 			}
+			return
 		} else {
 			fmt.Println("Opção inválida")
 		}
