@@ -78,17 +78,19 @@ func GetSharedDirectory(sharedPath string) []fs.DirEntry {
 }
 
 func GetCommands() string {
-	fmt.Println("Escolha um comando:\n\t[1] Listar peers\n\t[2] Obter peers\n\t[3] Listar arquivos locais\n\t[4] Buscar arquivos\n\t[5] Exibir estatisticas\n\t[6] Alterar tamanho de chunk\n\t[9] Sair")
+	fmt.Println("\n\nEscolha um comando:\n\t[1] Listar peers\n\t[2] Obter peers\n\t[3] Listar arquivos locais\n\t[4] Buscar arquivos\n\t[5] Exibir estatisticas\n\t[6] Alterar tamanho de chunk\n\t[9] Sair")
 	var x string
 	fmt.Print("> ")
 	fmt.Scanln(&x)
+	fmt.Println()
+	fmt.Println()
 	return x
 }
 
 func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
 	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
 	for addressPort, _ := range knowPeers {
-		fmt.Println("Enviando mensagem para ", addressPort)
+		//fmt.Println("Enviando mensagem para ", addressPort)
 		conn, err := net.Dial("tcp", addressPort)
 		err = sendMessage(conn, baseMessage, addressPort)
 		if err != nil {
