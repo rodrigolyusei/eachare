@@ -1,9 +1,16 @@
 package peers
 
+type PeerStatus bool
+
+const (
+	ONLINE  PeerStatus = true
+	OFFLINE PeerStatus = false
+)
+
 type Peer struct {
 	Address string
 	Port    string
-	Status  bool
+	Status  PeerStatus
 }
 
 func (peer Peer) FullAddress() string {
@@ -15,4 +22,19 @@ func (peer Peer) GetStatus() string {
 		return "Online"
 	}
 	return "Offline"
+}
+
+func (s PeerStatus) String() string {
+	if s {
+		return "ONLINE"
+	}
+	return "OFFLINE"
+}
+
+func GetPeerStatus(s string) PeerStatus {
+	switch s {
+	case "ONLINE":
+		return ONLINE
+	}
+	return OFFLINE
 }

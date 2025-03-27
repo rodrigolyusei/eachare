@@ -10,6 +10,7 @@ import (
 
 	"EACHare/src/commands"
 	"EACHare/src/number"
+	"EACHare/src/peers"
 )
 
 type SelfArgs struct {
@@ -19,6 +20,12 @@ type SelfArgs struct {
 	Shared    string
 }
 
+var knowPeers = make(map[string]peers.PeerStatus)
+
+func (args SelfArgs) FullAddress() string {
+	return args.Address + ":" + args.Port
+}
+
 func check(err error) {
 	if err != nil {
 		log.Fatal(err)
@@ -26,15 +33,12 @@ func check(err error) {
 }
 
 func listen(args SelfArgs) {
-	port, err := number.GetNextPort()
+	ln, err := net.Listen("tcp", args.FullAddress())
 	check(err)
+	go cliInterface(args)
 
-	ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
-	check(err)
-
-	fmt.Println("Server running on port " + strconv.Itoa(port))
+	fmt.Println("Server running on port " + args.Port)
 	for {
-		go cliInterface(args)
 		conn, err := ln.Accept()
 		if err != nil {
 			fmt.Println(err)
@@ -52,31 +56,48 @@ func handleConnection(conn net.Conn) {
 	_, err := conn.Read(buf)
 	check(err)
 
-	fmt.Printf("Received: %s", buf)
+	message := commands.ReceiveMessage(string(buf))
+
+	_, exists := knowPeers[message.Origin]
+
+	if (exists && knowPeers[message.Origin] == peers.OFFLINE) || knowPeers[message.Origin] == peers.OFFLINE {
+		knowPeers[message.Origin] = peers.ONLINE
+		fmt.Println("\tAtualizando peer " + message.Origin + " status ONLINE")
+	}
+
+	switch message.Type {
+	case commands.GET_PEERS:
+		commands.GetPeersResponse(conn, message, knowPeers)
+	case commands.PEER_LIST:
+		newPeers := commands.PeerListReceive(message)
+		commands.UpdatePeersMap(knowPeers, newPeers)
+	}
 }
 
 func cliInterface(args SelfArgs) {
 	for {
 		comm := commands.GetCommands()
-		if comm == "2" {
-			var input string
-			fmt.Scanln(&input)
+		if comm == "1" {
+			commands.ListPeers(knowPeers)
+		} else if comm == "2" {
+			// var input string
+			// fmt.Scanln(&input)
 
-			number, err := strconv.Atoi(input)
-			if err != nil {
-				fmt.Println("Error casting port to int! Did you write a number?")
-				continue
-			}
-			go client(number)
-		}
-		if comm == "3" {
+			// number, err := strconv.Atoi(input)
+			// if err != nil {
+			// 	fmt.Println("Error casting port to int! Did you write a number?")
+			// 	continue
+			// }
+			// go client(number)
+			commands.GetPeersRequest(knowPeers)
+		} else if comm == "3" {
 			shared := commands.GetSharedDirectory(args.Shared)
 			fmt.Println(shared)
-		}
-		if comm == "9" {
+		} else if comm == "9" {
 			fmt.Println("Saindo...")
 			return
 		}
+		fmt.Println()
 	}
 }
 
@@ -113,6 +134,24 @@ func main() {
 	// Pega os argumentos de entrada
 	all_args := getArgs(os.Args)
 
+	var test = true
+	if test {
+		port, err := number.GetNextPort()
+		check(err)
+		all_args.Address = "127.0.0.1"
+		all_args.Port = strconv.Itoa(port)
+	}
+	port, err := strconv.Atoi(all_args.Port)
+	check(err)
+	if port%2 == 0 {
+		knowPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
+		knowPeers["127.0.0.1:"+strconv.Itoa(port+2)] = peers.OFFLINE
+	} else {
+		knowPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
+		knowPeers["127.0.0.1:"+strconv.Itoa(port+3)] = peers.OFFLINE
+	}
+
+	commands.Address = all_args.Address + ":" + all_args.Port
 	// Imprime os parâmetros de entrada
 	fmt.Println("Endereço:", all_args.Address)
 	fmt.Println("Porta:", all_args.Port)
