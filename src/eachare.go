@@ -58,7 +58,12 @@ func handleConnection(conn net.Conn) {
 
 	message := commands.ReceiveMessage(string(buf))
 
-	knowPeers[message.Origin] = peers.ONLINE
+	_, exists := knowPeers[message.Origin]
+
+	if (exists && knowPeers[message.Origin] == peers.OFFLINE) || knowPeers[message.Origin] == peers.OFFLINE {
+		knowPeers[message.Origin] = peers.ONLINE
+		fmt.Println("\tAtualizando peer " + message.Origin + " status ONLINE")
+	}
 
 	switch message.Type {
 	case commands.GET_PEERS:
