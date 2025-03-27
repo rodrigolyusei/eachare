@@ -36,13 +36,15 @@ func check(err error) {
 }
 
 func listen(args SelfArgs) {
-	ln, err := net.Listen("tcp", args.FullAddress())
+	listener, err := net.Listen("tcp", args.FullAddress())
 	check(err)
+	defer listener.Close()
+
 	go cliInterface(args)
 
 	fmt.Println("Server running on port " + args.Port)
 	for {
-		conn, err := ln.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -74,6 +76,7 @@ func handleConnection(conn net.Conn) {
 	}
 
 	switch message.Type {
+	case commands.HELLO:
 	case commands.GET_PEERS:
 		commands.GetPeersResponse(conn, message, knowPeers)
 	case commands.PEER_LIST:
