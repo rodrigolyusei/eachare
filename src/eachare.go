@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"EACHare/src/commands"
 	"EACHare/src/number"
@@ -21,6 +22,8 @@ type SelfArgs struct {
 }
 
 var knowPeers = make(map[string]peers.PeerStatus)
+
+var waiting_cli = false
 
 func (args SelfArgs) FullAddress() string {
 	return args.Address + ":" + args.Port
@@ -52,6 +55,10 @@ func listen(args SelfArgs) {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
+	if waiting_cli {
+		fmt.Println()
+	}
+
 	buf := make([]byte, 1024)
 	_, err := conn.Read(buf)
 	check(err)
@@ -59,10 +66,11 @@ func handleConnection(conn net.Conn) {
 	message := commands.ReceiveMessage(string(buf))
 
 	_, exists := knowPeers[message.Origin]
-
-	if (exists && knowPeers[message.Origin] == peers.OFFLINE) || knowPeers[message.Origin] == peers.OFFLINE {
+	if !exists {
+		fmt.Println("\tAdicionando novo peer ", message.Origin, "status", peers.ONLINE)
+	} else if knowPeers[message.Origin] == peers.OFFLINE {
 		knowPeers[message.Origin] = peers.ONLINE
-		fmt.Println("\tAtualizando peer " + message.Origin + " status ONLINE")
+		fmt.Println("\tAtualizando peer "+message.Origin+" status ", peers.ONLINE)
 	}
 
 	switch message.Type {
@@ -72,10 +80,16 @@ func handleConnection(conn net.Conn) {
 		newPeers := commands.PeerListReceive(message)
 		commands.UpdatePeersMap(knowPeers, newPeers)
 	}
+
+	if waiting_cli {
+		fmt.Println()
+		fmt.Print("> ")
+	}
 }
 
 func cliInterface(args SelfArgs) {
 	for {
+		waiting_cli = true
 		comm := commands.GetCommands()
 		if comm == "1" {
 			commands.ListPeers(knowPeers)
@@ -97,7 +111,8 @@ func cliInterface(args SelfArgs) {
 			fmt.Println("Saindo...")
 			return
 		}
-		fmt.Println()
+		waiting_cli = false
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
