@@ -23,7 +23,7 @@ type BaseMessage struct {
 var Address string = "localhost"
 
 func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
-	conn, err := net.Dial("tcp", receiverAddress)
+	conn, _ := net.Dial("tcp", receiverAddress)
 	message.Clock = clock.UpdateClock()
 	arguments := ""
 	if message.Arguments != nil {
@@ -33,10 +33,10 @@ func sendMessage(connection net.Conn, message BaseMessage, receiverAddress strin
 	fmt.Printf("\tEncaminhando mensagem \"%s\" para %s\n", messageStr, receiverAddress)
 
 	if conn == nil {
-		return errors.New("Connection is nil")
+		return errors.New("connection is nil")
 	}
 	defer conn.Close()
-	_, err = conn.Write([]byte(messageStr))
+	_, err := conn.Write([]byte(messageStr))
 	return err
 }
 
@@ -65,7 +65,7 @@ func ReceiveMessage(message string) BaseMessage {
 
 func check(e error) {
 	if e != nil {
-		_ = fmt.Errorf("Error: %s", e)
+		_ = fmt.Errorf("error: %s", e)
 		panic(e)
 	}
 }
@@ -91,8 +91,8 @@ func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
 	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
 	for addressPort, _ := range knowPeers {
 		//fmt.Println("Enviando mensagem para ", addressPort)
-		conn, err := net.Dial("tcp", addressPort)
-		err = sendMessage(conn, baseMessage, addressPort)
+		conn, _ := net.Dial("tcp", addressPort)
+		err := sendMessage(conn, baseMessage, addressPort)
 		if err != nil {
 			knowPeers[addressPort] = peers.OFFLINE
 		} else {

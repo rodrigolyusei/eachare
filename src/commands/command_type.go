@@ -8,15 +8,15 @@ type CommandType uint8
 
 const (
 	UNKNOWN CommandType = iota
-	LIST_PEERS
+	HELLO_PEER
 	GET_PEERS
 	PEER_LIST
 )
 
 func (ct CommandType) String() string {
 	switch ct {
-	case LIST_PEERS:
-		return "LIST_PEERS"
+	case HELLO_PEER:
+		return "HELLO_PEER"
 	case GET_PEERS:
 		return "GET_PEERS"
 	case PEER_LIST:
@@ -32,8 +32,8 @@ func GetCommandType(s string) CommandType {
 	s = strings.Trim(s, "\r\n\t ") // Remove common control characters
 
 	switch s {
-	case "LIST_PEERS":
-		return LIST_PEERS
+	case "HELLO_PEER":
+		return HELLO_PEER
 	case "GET_PEERS":
 		return GET_PEERS
 	case "PEER_LIST":
