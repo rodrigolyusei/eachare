@@ -23,7 +23,7 @@ type BaseMessage struct {
 var Address string = "localhost"
 
 func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
-	conn, err := net.Dial("tcp", receiverAddress)
+	conn, _ := net.Dial("tcp", receiverAddress)
 	message.Clock = clock.UpdateClock()
 	arguments := ""
 	if message.Arguments != nil {
@@ -33,10 +33,10 @@ func sendMessage(connection net.Conn, message BaseMessage, receiverAddress strin
 	fmt.Printf("\tEncaminhando mensagem \"%s\" para %s\n", messageStr, receiverAddress)
 
 	if conn == nil {
-		return errors.New("Connection is nil")
+		return errors.New("connection is nil")
 	}
 	defer conn.Close()
-	_, err = conn.Write([]byte(messageStr))
+	_, err := conn.Write([]byte(messageStr))
 	return err
 }
 
@@ -51,7 +51,11 @@ func ReceiveMessage(message string) BaseMessage {
 	answer = append(answer, messageParts[3:]...)
 	receive := strings.Join(answer, " ")
 
-	fmt.Println("\t Resposta recebida: \"" + receive + "\"")
+	if strings.Trim(messageParts[2], "\x00") == "HELLO" {
+		fmt.Println("\tMensagem recebida: \"" + receive + "\"")
+	} else {
+		fmt.Println("\tResposta recebida: \"" + receive + "\"")
+	}
 
 	clock.UpdateClock()
 
@@ -65,7 +69,7 @@ func ReceiveMessage(message string) BaseMessage {
 
 func check(e error) {
 	if e != nil {
-		_ = fmt.Errorf("Error: %s", e)
+		_ = fmt.Errorf("error: %s", e)
 		panic(e)
 	}
 }
@@ -89,10 +93,10 @@ func GetCommands() string {
 
 func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
 	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
-	for addressPort, _ := range knowPeers {
+	for addressPort := range knowPeers {
 		//fmt.Println("Enviando mensagem para ", addressPort)
-		conn, err := net.Dial("tcp", addressPort)
-		err = sendMessage(conn, baseMessage, addressPort)
+		conn, _ := net.Dial("tcp", addressPort)
+		err := sendMessage(conn, baseMessage, addressPort)
 		if err != nil {
 			knowPeers[addressPort] = peers.OFFLINE
 		} else {
@@ -139,27 +143,44 @@ func PeerListReceive(baseMessage BaseMessage) []peers.Peer {
 func ListPeers(knowPeers map[string]peers.PeerStatus) {
 	fmt.Println("Lista de peers: ")
 	fmt.Println("\t[0] voltar para o menu anterior")
+
+	// Listar todos os peers conhecidos enquanto conta e armazena os endereços
+	var addrList []string
 	counter := 0
 	for addressPort, peerStatus := range knowPeers {
 		counter++
+		addrList = append(addrList, addressPort)
 		fmt.Println("\t[" + strconv.Itoa(counter) + "] " + addressPort + " " + peerStatus.String())
 	}
 
 	var input string
-
 	for {
+		// Lê a entrada do usuário
 		fmt.Print("> ")
 		fmt.Scanln(&input)
 		number, err := strconv.Atoi(input)
-		if err != nil || number != 0 {
-			fmt.Print("Inválido!\n")
-			continue
+		check(err)
+
+		// Envio de mensagem para o destino escolhido
+		if number == 0 {
+			return
+		} else if number > 0 && number <= counter {
+			// Enviar mensagem HELLO
+			baseMessage := BaseMessage{Clock: 0, Type: HELLO, Arguments: nil}
+			conn, _ := net.Dial("tcp", addrList[number-1])
+			err := sendMessage(conn, baseMessage, addrList[number-1])
+			if err != nil {
+				knowPeers[addrList[number-1]] = peers.OFFLINE
+				fmt.Println("\tAtualizando peer " + addrList[number-1] + " status OFFLINE")
+			} else {
+				knowPeers[addrList[number-1]] = peers.ONLINE
+				fmt.Println("\tAtualizando peer " + addrList[number-1] + " status ONLINE")
+			}
+			return
 		} else {
-			break
+			fmt.Println("Opção inválida")
 		}
-
 	}
-
 }
 
 func UpdatePeersMap(knowPeers map[string]peers.PeerStatus, newPeers []peers.Peer) {
