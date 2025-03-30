@@ -115,7 +115,7 @@ func GetPeersResponse(conn net.Conn, receivedMessage BaseMessage, knowPeers map[
 	sendMessage(conn, dropMessage, receivedMessage.Origin)
 }
 
-func PeerListReceive(baseMessage BaseMessage) []peers.Peer {
+func PeerListResponse(baseMessage BaseMessage) []peers.Peer {
 	peersCount, err := strconv.Atoi(baseMessage.Arguments[0])
 	check(err)
 

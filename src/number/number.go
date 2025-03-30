@@ -20,7 +20,7 @@ func GetNextPort() (int, error) {
 }
 
 func UpdateAndGetNumberFromFile() (int, error) {
-	filepath := filepath.Join("data.txt")
+	filepath := filepath.Join("number", "data.txt")
 
 	err := updateNumberInFile(filepath)
 	if err != nil {

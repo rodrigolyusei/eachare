@@ -7,10 +7,12 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"EACHare/src/commands"
+	"EACHare/src/number"
 	"EACHare/src/peers"
 )
 
@@ -79,7 +81,7 @@ func cliInterface(args SelfArgs) {
 			fmt.Println("Comando ainda não implementado")
 		case "9":
 			fmt.Println("Saindo...")
-			return
+			os.Exit(0)
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
 		}
@@ -88,6 +90,28 @@ func cliInterface(args SelfArgs) {
 		waiting_cli = false
 		time.Sleep(500 * time.Millisecond)
 	}
+}
+
+func testArgs(args []string) (SelfArgs, error) {
+	port, err := number.GetNextPort()
+	check(err)
+	if port%2 == 0 {
+		knownPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
+		knownPeers["127.0.0.1:"+strconv.Itoa(port+2)] = peers.OFFLINE
+	} else {
+		knownPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
+		knownPeers["127.0.0.1:"+strconv.Itoa(port+3)] = peers.OFFLINE
+	}
+
+	myargs := SelfArgs{Address: "127.0.0.1", Port: strconv.Itoa(port), Neighbors: args[2], Shared: args[3]}
+
+	// Imprime os parâmetros de entrada
+	fmt.Println("Endereço:", myargs.Address)
+	fmt.Println("Porta:", myargs.Port)
+	fmt.Println("Vizinhos:", myargs.Neighbors)
+	fmt.Println("Diretório Compartilhado:", myargs.Shared)
+
+	return myargs, nil
 }
 
 // Função para obter os argumentos de entrada
@@ -109,7 +133,7 @@ func getArgs(args []string) (SelfArgs, error) {
 }
 
 // Função para lidar com a conexão recebida
-func handleConnection(conn net.Conn) {
+func receiver(conn net.Conn) {
 	// defer(adia) a função de fechamento da conexão quando as operações terminarem
 	defer conn.Close()
 
@@ -133,11 +157,12 @@ func handleConnection(conn net.Conn) {
 	// Se o peer não for conhecido, adiciona-o ao mapa de peers conhecidos
 	// Se o peer for conhecido e estiver OFFLINE, atualiza seu status para ONLINE
 	if !exists {
-		fmt.Println("\tAdicionando novo peer ", message.Origin, "status", peers.ONLINE)
+		fmt.Println("\tAdicionando novo peer", message.Origin, "status", peers.ONLINE)
 	} else if knownPeers[message.Origin] == peers.OFFLINE {
-		knownPeers[message.Origin] = peers.ONLINE
-		fmt.Println("\tAtualizando peer "+message.Origin+" status ", peers.ONLINE)
+		fmt.Println("\tAtualizando peer", message.Origin, "status", peers.ONLINE)
 	}
+
+	knownPeers[message.Origin] = peers.ONLINE
 
 	// Lida o comando recebido de acordo com o tipo de mensagem
 	switch message.Type {
@@ -145,7 +170,7 @@ func handleConnection(conn net.Conn) {
 	case commands.GET_PEERS:
 		commands.GetPeersResponse(conn, message, knownPeers)
 	case commands.PEER_LIST:
-		newPeers := commands.PeerListReceive(message)
+		newPeers := commands.PeerListResponse(message)
 		commands.UpdatePeersMap(knownPeers, newPeers)
 	}
 
@@ -176,7 +201,7 @@ func listen(args SelfArgs) {
 		}
 
 		// Cria uma goroutine/thread para lidar com a conexão recebida
-		go handleConnection(conn)
+		go receiver(conn)
 	}
 }
 
@@ -186,32 +211,19 @@ func verifySharedDirectory(sharedPath string) error {
 }
 
 func main() {
-	// Pega os argumentos de entrada
-	myargs, err := getArgs(os.Args)
-	check(err)
+	var myargs SelfArgs
+	var err error
+	if len(os.Args) == 5 && os.Args[4] == "--test" {
+		myargs, err = testArgs(os.Args)
+		check(err)
+	} else {
+		// Pega os argumentos de entrada
+		myargs, err = getArgs(os.Args)
+		check(err)
 
-	// var test = true
-	// if test {
-	// 	port, err := number.GetNextPort()
-	// 	check(err)
-	// 	myargs.Address = "127.0.0.1"
-	// 	myargs.Port = strconv.Itoa(port)
-	// }
-	// port, err := strconv.Atoi(myargs.Port)
-	// check(err)
-	// if port%2 == 0 {
-	// 	knownPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
-	// 	knownPeers["127.0.0.1:"+strconv.Itoa(port+2)] = peers.OFFLINE
-	// } else {
-	// 	knownPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
-	// 	knownPeers["127.0.0.1:"+strconv.Itoa(port+3)] = peers.OFFLINE
-	// }
-	//
-	// // Imprime os parâmetros de entrada
-	// fmt.Println("Endereço:", myargs.Address)
-	// fmt.Println("Porta:", myargs.Port)
-	// fmt.Println("Vizinhos:", myargs.Neighbors)
-	// fmt.Println("Diretório Compartilhado:", myargs.Shared)
+		// err = addNeighbors(myargs.Neighbors)
+		// check(err)
+	}
 
 	err = verifySharedDirectory(myargs.Shared)
 	check(err)
