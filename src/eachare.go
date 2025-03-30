@@ -2,16 +2,15 @@ package main
 
 // Pacotes nativos de go e pacotes internos
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"EACHare/src/commands"
-	"EACHare/src/number"
 	"EACHare/src/peers"
 )
 
@@ -29,7 +28,7 @@ func (args SelfArgs) FullAddress() string {
 }
 
 // Cria um hashmap para armazenar os peers conhecidos e seus status
-var knowPeers = make(map[string]peers.PeerStatus)
+var knownPeers = make(map[string]peers.PeerStatus)
 
 // Variável para controlar o estado do CLI
 var waiting_cli = false
@@ -66,9 +65,9 @@ func cliInterface(args SelfArgs) {
 		// Executa o comando correspondente
 		switch comm {
 		case "1":
-			commands.ListPeers(knowPeers)
+			commands.ListPeers(knownPeers)
 		case "2":
-			commands.GetPeersRequest(knowPeers)
+			commands.GetPeersRequest(knownPeers)
 		case "3":
 			shared := commands.GetSharedDirectory(args.Shared)
 			fmt.Println(shared)
@@ -92,21 +91,21 @@ func cliInterface(args SelfArgs) {
 }
 
 // Função para obter os argumentos de entrada
-func getArgs(args []string) SelfArgs {
+func getArgs(args []string) (SelfArgs, error) {
 	// Verifica se o número de argumentos é válido e se o formato do endereço e porta está correto
 	if len(args) != 4 {
-		fmt.Println("Parâmetros de entrada inválidos, por favor, siga o formato abaixo:")
-		fmt.Println("./eachare <endereço>:<porta> <vizinhos> <diretório compartilhado>")
-		os.Exit(1)
+		str1 := "\nParâmetros de entrada inválidos, por favor, siga o formato abaixo:"
+		str2 := "\n./eachare <endereço>:<porta> <vizinhos> <diretório compartilhado>"
+		return SelfArgs{}, errors.New(str1 + str2)
 	} else if !strings.Contains(args[1], ":") {
-		fmt.Println("Endereço e porta inválidos, por favor, siga o formato abaixo:")
-		fmt.Println("./eachare <endereço>:<porta> <vizinhos> <diretório compartilhado>")
-		os.Exit(1)
+		str1 := "\nEndereço e porta inválidos, por favor, siga o formato abaixo:"
+		str2 := "\n./eachare <endereço>:<porta> <vizinhos> <diretório compartilhado>"
+		return SelfArgs{}, errors.New(str1 + str2)
 	}
 
 	// Se os parâmetros estiverem corretos, retorna cada uma separadamente
 	x := strings.Split(args[1], ":")
-	return SelfArgs{Address: x[0], Port: x[1], Neighbors: args[2], Shared: args[3]}
+	return SelfArgs{Address: x[0], Port: x[1], Neighbors: args[2], Shared: args[3]}, nil
 }
 
 // Função para lidar com a conexão recebida
@@ -129,14 +128,14 @@ func handleConnection(conn net.Conn) {
 	message := commands.ReceiveMessage(string(buf))
 
 	// Verifica se a mensagem recebida é de um peer conhecido
-	_, exists := knowPeers[message.Origin]
+	_, exists := knownPeers[message.Origin]
 
 	// Se o peer não for conhecido, adiciona-o ao mapa de peers conhecidos
 	// Se o peer for conhecido e estiver OFFLINE, atualiza seu status para ONLINE
 	if !exists {
 		fmt.Println("\tAdicionando novo peer ", message.Origin, "status", peers.ONLINE)
-	} else if knowPeers[message.Origin] == peers.OFFLINE {
-		knowPeers[message.Origin] = peers.ONLINE
+	} else if knownPeers[message.Origin] == peers.OFFLINE {
+		knownPeers[message.Origin] = peers.ONLINE
 		fmt.Println("\tAtualizando peer "+message.Origin+" status ", peers.ONLINE)
 	}
 
@@ -144,10 +143,10 @@ func handleConnection(conn net.Conn) {
 	switch message.Type {
 	case commands.HELLO:
 	case commands.GET_PEERS:
-		commands.GetPeersResponse(conn, message, knowPeers)
+		commands.GetPeersResponse(conn, message, knownPeers)
 	case commands.PEER_LIST:
 		newPeers := commands.PeerListReceive(message)
-		commands.UpdatePeersMap(knowPeers, newPeers)
+		commands.UpdatePeersMap(knownPeers, newPeers)
 	}
 
 	// Verifica se a CLI está esperando por uma entrada
@@ -181,34 +180,44 @@ func listen(args SelfArgs) {
 	}
 }
 
+func verifySharedDirectory(sharedPath string) error {
+	_, err := os.ReadDir(sharedPath)
+	return err
+}
+
 func main() {
 	// Pega os argumentos de entrada
-	all_args := getArgs(os.Args)
-
-	var test = true
-	if test {
-		port, err := number.GetNextPort()
-		check(err)
-		all_args.Address = "127.0.0.1"
-		all_args.Port = strconv.Itoa(port)
-	}
-	port, err := strconv.Atoi(all_args.Port)
+	myargs, err := getArgs(os.Args)
 	check(err)
-	if port%2 == 0 {
-		knowPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
-		knowPeers["127.0.0.1:"+strconv.Itoa(port+2)] = peers.OFFLINE
-	} else {
-		knowPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
-		knowPeers["127.0.0.1:"+strconv.Itoa(port+3)] = peers.OFFLINE
-	}
 
-	commands.Address = all_args.Address + ":" + all_args.Port
-	// Imprime os parâmetros de entrada
-	fmt.Println("Endereço:", all_args.Address)
-	fmt.Println("Porta:", all_args.Port)
-	fmt.Println("Vizinhos:", all_args.Neighbors)
-	fmt.Println("Diretório Compartilhado:", all_args.Shared)
+	// var test = true
+	// if test {
+	// 	port, err := number.GetNextPort()
+	// 	check(err)
+	// 	myargs.Address = "127.0.0.1"
+	// 	myargs.Port = strconv.Itoa(port)
+	// }
+	// port, err := strconv.Atoi(myargs.Port)
+	// check(err)
+	// if port%2 == 0 {
+	// 	knownPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
+	// 	knownPeers["127.0.0.1:"+strconv.Itoa(port+2)] = peers.OFFLINE
+	// } else {
+	// 	knownPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
+	// 	knownPeers["127.0.0.1:"+strconv.Itoa(port+3)] = peers.OFFLINE
+	// }
+	//
+	// // Imprime os parâmetros de entrada
+	// fmt.Println("Endereço:", myargs.Address)
+	// fmt.Println("Porta:", myargs.Port)
+	// fmt.Println("Vizinhos:", myargs.Neighbors)
+	// fmt.Println("Diretório Compartilhado:", myargs.Shared)
+
+	err = verifySharedDirectory(myargs.Shared)
+	check(err)
+
+	commands.Address = myargs.Address + ":" + myargs.Port
 
 	// Inicializa o servidor
-	listen(all_args)
+	listen(myargs)
 }

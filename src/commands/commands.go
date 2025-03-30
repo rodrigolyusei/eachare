@@ -22,6 +22,13 @@ type BaseMessage struct {
 
 var Address string = "localhost"
 
+func check(e error) {
+	if e != nil {
+		_ = fmt.Errorf("error: %s", e)
+		panic(e)
+	}
+}
+
 func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
 	conn, _ := net.Dial("tcp", receiverAddress)
 	message.Clock = clock.UpdateClock()
@@ -64,13 +71,6 @@ func ReceiveMessage(message string) BaseMessage {
 		Clock:     receivedClock,
 		Type:      GetCommandType(messageParts[2]),
 		Arguments: messageParts[3:],
-	}
-}
-
-func check(e error) {
-	if e != nil {
-		_ = fmt.Errorf("error: %s", e)
-		panic(e)
 	}
 }
 
