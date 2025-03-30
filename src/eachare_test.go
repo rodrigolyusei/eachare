@@ -3,20 +3,23 @@ package main
 import "testing"
 
 func TestGetArgs(t *testing.T) {
-	all_args := getArgs([]string{"eachare", "localhost:8080", "vizinhos", "../shared"})
+	myargs, err := getArgs([]string{"eachare", "localhost:8080", "vizinhos", "../shared"})
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
 
-	if all_args.Address != "localhost" {
+	if myargs.Address != "localhost" {
 		t.Errorf("Addrs is casting invalid!")
 	}
-	if all_args.Port != "8080" {
+	if myargs.Port != "8080" {
 		t.Errorf("Port is casting invalid!")
 	}
 
-	if all_args.Neighbors != "vizinhos" {
+	if myargs.Neighbors != "vizinhos" {
 		t.Errorf("Neighbors is casting invalid!")
 	}
 
-	if all_args.Shared != "../shared" {
+	if myargs.Shared != "../shared" {
 		t.Errorf("Shared is casting invalid!")
 	}
 }

@@ -22,6 +22,13 @@ type BaseMessage struct {
 
 var Address string = "localhost"
 
+func check(e error) {
+	if e != nil {
+		_ = fmt.Errorf("error: %s", e)
+		panic(e)
+	}
+}
+
 func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
 	conn, _ := net.Dial("tcp", receiverAddress)
 	message.Clock = clock.UpdateClock()
@@ -67,28 +74,11 @@ func ReceiveMessage(message string) BaseMessage {
 	}
 }
 
-func check(e error) {
-	if e != nil {
-		_ = fmt.Errorf("error: %s", e)
-		panic(e)
-	}
-}
-
 func GetSharedDirectory(sharedPath string) []fs.DirEntry {
 	entries, err := os.ReadDir(sharedPath)
 	check(err)
 
 	return entries
-}
-
-func GetCommands() string {
-	fmt.Println("\n\nEscolha um comando:\n\t[1] Listar peers\n\t[2] Obter peers\n\t[3] Listar arquivos locais\n\t[4] Buscar arquivos\n\t[5] Exibir estatisticas\n\t[6] Alterar tamanho de chunk\n\t[9] Sair")
-	var x string
-	fmt.Print("> ")
-	fmt.Scanln(&x)
-	fmt.Println()
-	fmt.Println()
-	return x
 }
 
 func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
@@ -98,9 +88,15 @@ func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
 		conn, _ := net.Dial("tcp", addressPort)
 		err := sendMessage(conn, baseMessage, addressPort)
 		if err != nil {
-			knowPeers[addressPort] = peers.OFFLINE
+			if knowPeers[addressPort] == peers.ONLINE {
+				fmt.Println("\tAtualizando peer " + addressPort + " status OFFLINE")
+				knowPeers[addressPort] = peers.OFFLINE
+			}
 		} else {
-			knowPeers[addressPort] = peers.ONLINE
+			if knowPeers[addressPort] == peers.OFFLINE {
+				fmt.Println("\tAtualizando peer " + addressPort + " status ONLINE")
+				knowPeers[addressPort] = peers.ONLINE
+			}
 		}
 	}
 }
@@ -125,7 +121,7 @@ func GetPeersResponse(conn net.Conn, receivedMessage BaseMessage, knowPeers map[
 	sendMessage(conn, dropMessage, receivedMessage.Origin)
 }
 
-func PeerListReceive(baseMessage BaseMessage) []peers.Peer {
+func PeerListResponse(baseMessage BaseMessage) []peers.Peer {
 	peersCount, err := strconv.Atoi(baseMessage.Arguments[0])
 	check(err)
 
@@ -138,6 +134,14 @@ func PeerListReceive(baseMessage BaseMessage) []peers.Peer {
 	}
 
 	return newPeers
+}
+
+func ListLocalFiles(sharedPath string) {
+	entries, err := os.ReadDir(sharedPath)
+	check(err)
+	for _, entry := range entries {
+		fmt.Println("\t" + entry.Name())
+	}
 }
 
 func ListPeers(knowPeers map[string]peers.PeerStatus) {
@@ -187,6 +191,7 @@ func UpdatePeersMap(knowPeers map[string]peers.PeerStatus, newPeers []peers.Peer
 	for _, newPeer := range newPeers {
 		_, exists := knowPeers[newPeer.FullAddress()]
 		if !exists {
+			fmt.Println("\tAdicionando novo peer", newPeer.FullAddress(), "status", newPeer.Status)
 			knowPeers[newPeer.FullAddress()] = newPeer.Status
 		}
 	}

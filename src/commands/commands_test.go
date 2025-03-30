@@ -83,7 +83,7 @@ func TestPeerListReceive(t *testing.T) {
 
 	expected := []string{"127.0.0.1:9002", "127.0.0.1:9004"}
 
-	receivePeers := PeerListReceive(message)
+	receivePeers := PeerListResponse(message)
 
 	for i, peer := range receivePeers {
 		if peer.FullAddress() != expected[i] {
@@ -95,7 +95,7 @@ func TestPeerListReceive(t *testing.T) {
 	}
 }
 
-func TestPeerListReceiveOffline(t *testing.T) {
+func TestPeerListResponseOffline(t *testing.T) {
 	message := BaseMessage{
 		Clock:     0,
 		Type:      PEER_LIST,
@@ -104,7 +104,7 @@ func TestPeerListReceiveOffline(t *testing.T) {
 
 	expected := "127.0.0.1:9002"
 
-	receivePeers := PeerListReceive(message)
+	receivePeers := PeerListResponse(message)
 
 	for i, peer := range receivePeers {
 		if peer.FullAddress() != expected {
@@ -116,14 +116,14 @@ func TestPeerListReceiveOffline(t *testing.T) {
 	}
 }
 
-func TestPeerListReceiveArgumentsNil(t *testing.T) {
+func TestPeerListResponseArgumentsNil(t *testing.T) {
 	message := BaseMessage{
 		Clock:     0,
 		Type:      PEER_LIST,
 		Arguments: []string{"0"},
 	}
 
-	peers := PeerListReceive(message)
+	peers := PeerListResponse(message)
 
 	if len(peers) != 0 {
 		t.Fatalf("Expected 0 peers, got %d", len(peers))
