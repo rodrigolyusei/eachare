@@ -83,7 +83,7 @@ func GetSharedDirectory(sharedPath string) []fs.DirEntry {
 }
 
 func GetPeersRequest(knowPeers map[string]peers.PeerStatus) []net.Conn {
-	connections := make([]net.Conn, len(knowPeers))
+	connections := make([]net.Conn, 0)
 	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
 	for addressPort := range knowPeers {
 		//fmt.Println("Enviando mensagem para ", addressPort)
