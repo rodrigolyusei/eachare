@@ -68,5 +68,5 @@ func getNumberFromFile(filename string) (int, error) {
 	}
 	number = number % 90
 
-	return number, nil
+	return number + 10, nil
 }

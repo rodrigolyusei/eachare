@@ -88,9 +88,15 @@ func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
 		conn, _ := net.Dial("tcp", addressPort)
 		err := sendMessage(conn, baseMessage, addressPort)
 		if err != nil {
-			knowPeers[addressPort] = peers.OFFLINE
+			if knowPeers[addressPort] == peers.ONLINE {
+				fmt.Println("\tAtualizando peer " + addressPort + " status OFFLINE")
+				knowPeers[addressPort] = peers.OFFLINE
+			}
 		} else {
-			knowPeers[addressPort] = peers.ONLINE
+			if knowPeers[addressPort] == peers.OFFLINE {
+				fmt.Println("\tAtualizando peer " + addressPort + " status ONLINE")
+				knowPeers[addressPort] = peers.ONLINE
+			}
 		}
 	}
 }
@@ -185,6 +191,7 @@ func UpdatePeersMap(knowPeers map[string]peers.PeerStatus, newPeers []peers.Peer
 	for _, newPeer := range newPeers {
 		_, exists := knowPeers[newPeer.FullAddress()]
 		if !exists {
+			fmt.Println("\tAdicionando novo peer", newPeer.FullAddress(), "status", newPeer.Status)
 			knowPeers[newPeer.FullAddress()] = newPeer.Status
 		}
 	}
