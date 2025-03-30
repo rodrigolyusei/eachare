@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"EACHare/src/clock"
 	"EACHare/src/peers"
@@ -30,7 +31,7 @@ func check(e error) {
 }
 
 func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
-	conn, _ := net.Dial("tcp", receiverAddress)
+	//conn, _ := net.Dial("tcp", receiverAddress)
 	message.Clock = clock.UpdateClock()
 	arguments := ""
 	if message.Arguments != nil {
@@ -39,11 +40,11 @@ func sendMessage(connection net.Conn, message BaseMessage, receiverAddress strin
 	messageStr := fmt.Sprintf("%s %d %s%s", Address, message.Clock, message.Type.String(), arguments)
 	fmt.Printf("\tEncaminhando mensagem \"%s\" para %s\n", messageStr, receiverAddress)
 
-	if conn == nil {
+	if connection == nil {
 		return errors.New("connection is nil")
 	}
-	defer conn.Close()
-	_, err := conn.Write([]byte(messageStr))
+	//defer conn.Close()
+	_, err := connection.Write([]byte(messageStr))
 	return err
 }
 
@@ -81,11 +82,17 @@ func GetSharedDirectory(sharedPath string) []fs.DirEntry {
 	return entries
 }
 
-func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
+func GetPeersRequest(knowPeers map[string]peers.PeerStatus) []net.Conn {
+	connections := make([]net.Conn, len(knowPeers))
 	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
 	for addressPort := range knowPeers {
 		//fmt.Println("Enviando mensagem para ", addressPort)
 		conn, _ := net.Dial("tcp", addressPort)
+		if conn != nil {
+			connections = append(connections, conn)
+			conn.SetDeadline(time.Now().Add(2 * time.Second))
+			//go connectionT(conn)
+		}
 		err := sendMessage(conn, baseMessage, addressPort)
 		if err != nil {
 			if knowPeers[addressPort] == peers.ONLINE {
@@ -99,7 +106,21 @@ func GetPeersRequest(knowPeers map[string]peers.PeerStatus) {
 			}
 		}
 	}
+	return connections
 }
+
+// func connectionT(con net.Conn) {
+// 	for {
+// 		buf := make([]byte, 1024)
+// 		_, err := con.Read(buf)
+// 		if err != nil {
+// 			break
+// 			//fmt.Println("Erro ao ler conexão:", err)
+// 		}
+// 		fmt.Println("\tMensagem recebida pela thread errada: \"" + string(buf) + "\"")
+// 		//message := ReceiveMessage(string(buf))
+// 	}
+// }
 
 func GetPeersResponse(conn net.Conn, receivedMessage BaseMessage, knowPeers map[string]peers.PeerStatus) {
 	//fmt.Print("Preparando get Peersresponse...")
@@ -172,6 +193,9 @@ func ListPeers(knowPeers map[string]peers.PeerStatus) {
 			// Enviar mensagem HELLO
 			baseMessage := BaseMessage{Clock: 0, Type: HELLO, Arguments: nil}
 			conn, _ := net.Dial("tcp", addrList[number-1])
+			if conn != nil {
+				defer conn.Close()
+			}
 			err := sendMessage(conn, baseMessage, addrList[number-1])
 			if err != nil {
 				knowPeers[addrList[number-1]] = peers.OFFLINE
