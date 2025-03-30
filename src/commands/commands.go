@@ -130,6 +130,14 @@ func PeerListResponse(baseMessage BaseMessage) []peers.Peer {
 	return newPeers
 }
 
+func ListLocalFiles(sharedPath string) {
+	entries, err := os.ReadDir(sharedPath)
+	check(err)
+	for _, entry := range entries {
+		fmt.Println("\t" + entry.Name())
+	}
+}
+
 func ListPeers(knowPeers map[string]peers.PeerStatus) {
 	fmt.Println("Lista de peers: ")
 	fmt.Println("\t[0] voltar para o menu anterior")

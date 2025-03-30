@@ -26,4 +26,4 @@ go.work.sum
 
 # Project specific
 temp/
-src/data.txt
+*/data.txt

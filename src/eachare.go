@@ -71,8 +71,7 @@ func cliInterface(args SelfArgs) {
 		case "2":
 			commands.GetPeersRequest(knownPeers)
 		case "3":
-			shared := commands.GetSharedDirectory(args.Shared)
-			fmt.Println(shared)
+			commands.ListLocalFiles(args.Shared)
 		case "4":
 			fmt.Println("Comando ainda não implementado")
 		case "5":
@@ -92,9 +91,13 @@ func cliInterface(args SelfArgs) {
 	}
 }
 
+// Função de teste para simular a execução do programa com argumentos específicos
 func testArgs(args []string) (SelfArgs, error) {
+	// Obtém a porta a partir do número no data.txt
 	port, err := number.GetNextPort()
 	check(err)
+
+	// Cria um mapa de peers dinamicamente
 	if port%2 == 0 {
 		knownPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
 		knownPeers["127.0.0.1:"+strconv.Itoa(port+2)] = peers.OFFLINE
@@ -103,6 +106,7 @@ func testArgs(args []string) (SelfArgs, error) {
 		knownPeers["127.0.0.1:"+strconv.Itoa(port+3)] = peers.OFFLINE
 	}
 
+	// Cria o SelfArgs com os argumentos de teste
 	myargs := SelfArgs{Address: "127.0.0.1", Port: strconv.Itoa(port), Neighbors: args[2], Shared: args[3]}
 
 	// Imprime os parâmetros de entrada
@@ -154,14 +158,14 @@ func receiver(conn net.Conn) {
 	// Verifica se a mensagem recebida é de um peer conhecido
 	_, exists := knownPeers[message.Origin]
 
-	// Se o peer não for conhecido, adiciona-o ao mapa de peers conhecidos
-	// Se o peer for conhecido e estiver OFFLINE, atualiza seu status para ONLINE
+	// Mensagem para o caso do peer não ser conhecido ou não estar online
 	if !exists {
 		fmt.Println("\tAdicionando novo peer", message.Origin, "status", peers.ONLINE)
 	} else if knownPeers[message.Origin] == peers.OFFLINE {
 		fmt.Println("\tAtualizando peer", message.Origin, "status", peers.ONLINE)
 	}
 
+	// Adiciona o peer para conhecidos com status ONLINE
 	knownPeers[message.Origin] = peers.ONLINE
 
 	// Lida o comando recebido de acordo com o tipo de mensagem
@@ -182,7 +186,7 @@ func receiver(conn net.Conn) {
 }
 
 // Função para iniciar o peer e escutar conexões
-func listen(args SelfArgs) {
+func listener(args SelfArgs) {
 	// Cria um listener TCP no endereço e porta especificado
 	listener, err := net.Listen("tcp", args.FullAddress())
 	check(err)
@@ -205,6 +209,7 @@ func listen(args SelfArgs) {
 	}
 }
 
+// Verifica se o diretório compartilhado existe e está acessível
 func verifySharedDirectory(sharedPath string) error {
 	_, err := os.ReadDir(sharedPath)
 	return err
@@ -213,6 +218,8 @@ func verifySharedDirectory(sharedPath string) error {
 func main() {
 	var myargs SelfArgs
 	var err error
+
+	// Verifica se o programa está sendo executado em modo de teste ou não
 	if len(os.Args) == 5 && os.Args[4] == "--test" {
 		myargs, err = testArgs(os.Args)
 		check(err)
@@ -221,15 +228,17 @@ func main() {
 		myargs, err = getArgs(os.Args)
 		check(err)
 
+		// Adiciona os vizinhos conhecidos pelo arquivo de vizinhos
 		// err = addNeighbors(myargs.Neighbors)
 		// check(err)
 	}
 
+	// Verifica o diretório compartilhado
 	err = verifySharedDirectory(myargs.Shared)
 	check(err)
 
 	commands.Address = myargs.Address + ":" + myargs.Port
 
 	// Inicializa o servidor
-	listen(myargs)
+	listener(myargs)
 }
