@@ -157,6 +157,22 @@ func PeerListResponse(baseMessage BaseMessage) []peers.Peer {
 	return newPeers
 }
 
+func ByeRequest(knowPeers map[string]peers.PeerStatus) {
+	baseMessage := BaseMessage{Origin: Address, Clock: 0, Type: BYE, Arguments: nil}
+
+	for addressPort := range knowPeers {
+		conn, err := net.Dial("tcp", addressPort)
+		if err == nil {
+			conn.SetDeadline(time.Now().Add(2 * time.Second))
+			defer conn.Close()
+		}
+		err = sendMessage(conn, baseMessage, addressPort)
+		if err != nil {
+			continue
+		}
+	}
+}
+
 func ListLocalFiles(sharedPath string) {
 	entries, err := os.ReadDir(sharedPath)
 	check(err)

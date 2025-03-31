@@ -85,6 +85,7 @@ func cliInterface(args SelfArgs) {
 			fmt.Println("Comando ainda não implementado")
 		case "9":
 			fmt.Println("Saindo...")
+			commands.ByeRequest(knownPeers)
 			os.Exit(0)
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
@@ -190,6 +191,9 @@ func receiver(conn net.Conn) {
 		case commands.PEER_LIST:
 			newPeers := commands.PeerListResponse(message)
 			commands.UpdatePeersMap(knownPeers, newPeers)
+		case commands.BYE:
+			knownPeers[message.Origin] = peers.OFFLINE
+			fmt.Println("\tAtualizando peer", message.Origin, "status", peers.OFFLINE)
 		}
 
 		// Verifica se a CLI está esperando por uma entrada
