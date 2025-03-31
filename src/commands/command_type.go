@@ -11,6 +11,7 @@ const (
 	HELLO
 	GET_PEERS
 	PEER_LIST
+	BYE
 )
 
 func (ct CommandType) String() string {
@@ -21,6 +22,8 @@ func (ct CommandType) String() string {
 		return "GET_PEERS"
 	case PEER_LIST:
 		return "PEER_LIST"
+	case BYE:
+		return "BYE"
 	}
 
 	return "UNKNOWN"
@@ -38,6 +41,8 @@ func GetCommandType(s string) CommandType {
 		return GET_PEERS
 	case "PEER_LIST":
 		return PEER_LIST
+	case "BYE":
+		return BYE
 	}
 	return 0
 }
