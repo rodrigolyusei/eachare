@@ -24,76 +24,42 @@ type SelfArgs struct {
 	Shared    string
 }
 
-// Método do SelfArgs para retornar o endereço completo (endereço + porta)
-func (args SelfArgs) FullAddress() string {
-	return args.Address + ":" + args.Port
+// Variáveis globais
+var err error                                      // Armazena o erro
+var knownPeers = make(map[string]peers.PeerStatus) // Hashmap para os peers conhecidos e seus status
+var myargs SelfArgs                                // Armazena os parâmetros de si mesmo
+var waiting_cli = false                            // Variável para controlar o estado do CLI
+
+// Função principal do programa
+func main() {
+	// Verifica se o programa está sendo executado em modo de teste ou não
+	if len(os.Args) == 5 && os.Args[4] == "--test" {
+		myargs, err = testArgs(os.Args)
+		check(err)
+	} else {
+		// Pega os argumentos de entrada
+		myargs, err = getArgs(os.Args)
+		check(err)
+
+		// Adiciona os vizinhos conhecidos pelo arquivo de vizinhos
+		err = addNeighbors(myargs.Neighbors)
+		check(err)
+	}
+
+	// Verifica o diretório compartilhado
+	err = verifySharedDirectory(myargs.Shared)
+	check(err)
+
+	commands.Address = myargs.FullAddress()
+
+	// Inicializa o servidor
+	listener(myargs)
 }
-
-// Cria um hashmap para armazenar os peers conhecidos e seus status
-var knownPeers = make(map[string]peers.PeerStatus)
-
-// Variável para controlar o estado do CLI
-var waiting_cli = false
 
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
 	if err != nil {
 		log.Fatal(err)
-	}
-}
-
-// Função para a CLI/menu de interação com o usuário
-func cliInterface(args SelfArgs) {
-	for {
-		// Indica que a CLI está esperando por uma entrada
-		waiting_cli = true
-
-		// Imprime o menu de opções
-		fmt.Println("\nEscolha um comando:")
-		fmt.Println("\t[1] Listar peers")
-		fmt.Println("\t[2] Obter peers")
-		fmt.Println("\t[3] Listar arquivos locais")
-		fmt.Println("\t[4] Buscar arquivos")
-		fmt.Println("\t[5] Exibir estatisticas")
-		fmt.Println("\t[6] Alterar tamanho de chunk")
-		fmt.Println("\t[9] Sair")
-		fmt.Print("> ")
-
-		// Lê a entrada do usuário
-		var comm string
-		fmt.Scanln(&comm)
-		fmt.Println()
-
-		// Executa o comando correspondente
-		switch comm {
-		case "1":
-			commands.ListPeers(knownPeers)
-		case "2":
-			connections := commands.GetPeersRequest(knownPeers)
-			for _, conn := range connections {
-				if conn != nil {
-					go receiver(conn)
-				}
-			}
-		case "3":
-			commands.ListLocalFiles(args.Shared)
-		case "4":
-			fmt.Println("Comando ainda não implementado")
-		case "5":
-			fmt.Println("Comando ainda não implementado")
-		case "6":
-			fmt.Println("Comando ainda não implementado")
-		case "9":
-			fmt.Println("Saindo...")
-			commands.ByeRequest(knownPeers)
-			os.Exit(0)
-		default:
-			fmt.Println("Comando inválido, tente novamente.")
-		}
-
-		// Indica que a CLI não está mais esperando por uma entrada
-		waiting_cli = false
-		time.Sleep(500 * time.Millisecond)
 	}
 }
 
@@ -140,6 +106,56 @@ func getArgs(args []string) (SelfArgs, error) {
 	// Se os parâmetros estiverem corretos, retorna cada uma separadamente
 	x := strings.Split(args[1], ":")
 	return SelfArgs{Address: x[0], Port: x[1], Neighbors: args[2], Shared: args[3]}, nil
+}
+
+// Função para adicionar vizinhos conhecidos a partir de um arquivo
+func addNeighbors(neighborsPath string) error {
+	// Lê o arquivo de vizinhos
+	neighborsFile, err := os.ReadFile(neighborsPath)
+	if err != nil {
+		return err
+	}
+
+	// Separa os vizinhos por linhas
+	neighbors := strings.Split(string(neighborsFile), "\n")
+	for _, neighbor := range neighbors {
+		knownPeers[neighbor] = peers.OFFLINE
+	}
+	return nil
+}
+
+// Verifica se o diretório compartilhado existe e está acessível
+func verifySharedDirectory(sharedPath string) error {
+	_, err := os.ReadDir(sharedPath)
+	return err
+}
+
+// Método do SelfArgs para retornar o endereço completo (endereço + porta)
+func (args SelfArgs) FullAddress() string {
+	return args.Address + ":" + args.Port
+}
+
+// Função para iniciar o peer e escutar conexões
+func listener(args SelfArgs) {
+	// Cria um listener TCP no endereço e porta especificado
+	listener, err := net.Listen("tcp", args.FullAddress())
+	check(err)
+	defer listener.Close()
+
+	// Cria uma goroutine/thread para a CLI
+	go cliInterface(args)
+
+	// Loop para receber mensagens de outros peers
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		// Cria uma goroutine/thread para lidar com a conexão recebida
+		go receiver(conn)
+	}
 }
 
 // Função para lidar com a conexão recebida
@@ -204,60 +220,57 @@ func receiver(conn net.Conn) {
 	}
 }
 
-// Função para iniciar o peer e escutar conexões
-func listener(args SelfArgs) {
-	// Cria um listener TCP no endereço e porta especificado
-	listener, err := net.Listen("tcp", args.FullAddress())
-	check(err)
-	defer listener.Close()
-
-	// Cria uma goroutine/thread para a CLI
-	go cliInterface(args)
-
-	fmt.Println("Server running on port " + args.Port)
-	// Loop para receber mensagens de outros peers
+// Função para a CLI/menu de interação com o usuário
+func cliInterface(args SelfArgs) {
 	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Println(err)
-			continue
+		// Indica que a CLI está esperando por uma entrada
+		waiting_cli = true
+
+		// Imprime o menu de opções
+		fmt.Println("\nEscolha um comando:")
+		fmt.Println("\t[1] Listar peers")
+		fmt.Println("\t[2] Obter peers")
+		fmt.Println("\t[3] Listar arquivos locais")
+		fmt.Println("\t[4] Buscar arquivos")
+		fmt.Println("\t[5] Exibir estatisticas")
+		fmt.Println("\t[6] Alterar tamanho de chunk")
+		fmt.Println("\t[9] Sair")
+		fmt.Print("> ")
+
+		// Lê a entrada do usuário
+		var comm string
+		fmt.Scanln(&comm)
+		fmt.Println()
+
+		// Executa o comando correspondente
+		switch comm {
+		case "1":
+			commands.ListPeers(knownPeers)
+		case "2":
+			connections := commands.GetPeersRequest(knownPeers)
+			for _, conn := range connections {
+				if conn != nil {
+					go receiver(conn)
+				}
+			}
+		case "3":
+			commands.ListLocalFiles(args.Shared)
+		case "4":
+			fmt.Println("Comando ainda não implementado")
+		case "5":
+			fmt.Println("Comando ainda não implementado")
+		case "6":
+			fmt.Println("Comando ainda não implementado")
+		case "9":
+			fmt.Println("Saindo...")
+			commands.ByeRequest(knownPeers)
+			os.Exit(0)
+		default:
+			fmt.Println("Comando inválido, tente novamente.")
 		}
 
-		// Cria uma goroutine/thread para lidar com a conexão recebida
-		go receiver(conn)
+		// Indica que a CLI não está mais esperando por uma entrada
+		waiting_cli = false
+		time.Sleep(500 * time.Millisecond)
 	}
-}
-
-// Verifica se o diretório compartilhado existe e está acessível
-func verifySharedDirectory(sharedPath string) error {
-	_, err := os.ReadDir(sharedPath)
-	return err
-}
-
-func main() {
-	var myargs SelfArgs
-	var err error
-
-	// Verifica se o programa está sendo executado em modo de teste ou não
-	if len(os.Args) == 5 && os.Args[4] == "--test" {
-		myargs, err = testArgs(os.Args)
-		check(err)
-	} else {
-		// Pega os argumentos de entrada
-		myargs, err = getArgs(os.Args)
-		check(err)
-
-		// Adiciona os vizinhos conhecidos pelo arquivo de vizinhos
-		// err = addNeighbors(myargs.Neighbors)
-		// check(err)
-	}
-
-	// Verifica o diretório compartilhado
-	err = verifySharedDirectory(myargs.Shared)
-	check(err)
-
-	commands.Address = myargs.Address + ":" + myargs.Port
-
-	// Inicializa o servidor
-	listener(myargs)
 }

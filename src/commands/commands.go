@@ -23,10 +23,10 @@ type BaseMessage struct {
 
 var Address string = "localhost"
 
-func check(e error) {
-	if e != nil {
-		_ = fmt.Errorf("error: %s", e)
-		panic(e)
+func check(err error) {
+	if err != nil {
+		_ = fmt.Errorf("error: %s", err)
+		panic(err)
 	}
 }
 
