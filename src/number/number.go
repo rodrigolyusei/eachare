@@ -1,5 +1,6 @@
 package number
 
+// Pacotes nativos de go
 import (
 	"os"
 	"path/filepath"
@@ -7,26 +8,34 @@ import (
 	"strings"
 )
 
+// Função para obter o próximo número de porta
 func GetNextPort() (int, error) {
+	// Atualiza e obtém o número do arquivo
 	number, err := UpdateAndGetNumberFromFile()
 	if err != nil {
 		return 0, err
 	}
-	port, err := strconv.Atoi("80" + strconv.Itoa(number))
+
+	// Concatena com 100 para selecionar a porta não privilegiada
+	port, err := strconv.Atoi("100" + strconv.Itoa(number))
 	if err != nil {
 		return 0, err
 	}
 	return port, nil
 }
 
+// Função para atualizar o número no arquivo e retornar o número atualizado
 func UpdateAndGetNumberFromFile() (int, error) {
+	// Define o caminho do arquivo
 	filepath := filepath.Join("number", "data.txt")
 
+	// Atualiza antes de ler o número
 	err := updateNumberInFile(filepath)
 	if err != nil {
 		return 0, err
 	}
 
+	// Lê o número do arquivo e retorna se não tiver erro
 	number, err := getNumberFromFile(filepath)
 	if err != nil {
 		return 0, err
@@ -35,38 +44,42 @@ func UpdateAndGetNumberFromFile() (int, error) {
 	return number, nil
 }
 
+// Função para atualizar o número no arquivo
 func updateNumberInFile(filename string) error {
+	// Lê o arquivo
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
 
-	// Convert the data to an integer
+	// Converte o dado para um inteiro
 	number, err := strconv.Atoi(strings.TrimSpace(string(data)))
 	if err != nil {
 		return err
 	}
 
-	// Increase the number by one
+	// Incrementa e escreve o número no arquivo
 	number++
-
-	// Write the updated number back to the file
 	return os.WriteFile(filename, []byte(strconv.Itoa(number)), 0644)
 }
 
+// Função para obter o número do arquivo
 func getNumberFromFile(filename string) (int, error) {
-	// Read the number from the file
+	// Lê o arquivo
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return 0, err
 	}
 
-	// Convert the data to an integer
+	// Converte o dado para um inteiro
 	number, err := strconv.Atoi(strings.TrimSpace(string(data)))
 	if err != nil {
 		return 0, err
 	}
+
+	// Calcula o módulo para obter valor entre 0 e 90
 	number = number % 90
 
+	// O valor retornado será entre 10 e 100
 	return number + 10, nil
 }

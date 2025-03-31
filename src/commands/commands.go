@@ -1,5 +1,6 @@
 package commands
 
+// Pacotes nativos de go e pacotes internos
 import (
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"EACHare/src/peers"
 )
 
+// Estrutura para armazenar as informações da mensagem
 type BaseMessage struct {
 	Origin    string
 	Clock     int
@@ -21,8 +23,10 @@ type BaseMessage struct {
 	Arguments []string
 }
 
+// Variável para o endereço do peer próprio
 var Address string = "localhost"
 
+// Função para verificar e imprimir mensagem de erro
 func check(err error) {
 	if err != nil {
 		_ = fmt.Errorf("error: %s", err)
@@ -30,25 +34,37 @@ func check(err error) {
 	}
 }
 
+// Função para enviar mensagem
 func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
+	// Atualiza o clock antes de enviar mensagem
 	message.Clock = clock.UpdateClock()
+
+	// Cria a string do argumento da mensagem enviada
 	arguments := ""
 	if message.Arguments != nil {
 		arguments = " " + strings.Join(message.Arguments, " ")
 	}
+
+	// Cria a string da mensagem inteira e imprime o encaminhamento
 	messageStr := fmt.Sprintf("%s %d %s%s", Address, message.Clock, message.Type.String(), arguments)
 	fmt.Printf("\tEncaminhando mensagem \"%s\" para %s\n", messageStr, receiverAddress)
 
+	// Se a conexão é nula retorna um erro
 	if connection == nil {
 		return errors.New("connection is nil")
 	}
 
+	// Envia a mensagem pela conexão
 	_, err := connection.Write([]byte(messageStr))
 	return err
 }
 
+// Função para receber mensagem
 func ReceiveMessage(message string) BaseMessage {
+	// Recupera as partes da mensagem
 	messageParts := strings.Split(message, " ")
+
+	// Guarda o valor do clock da mensagem recebida
 	receivedClock, err := strconv.Atoi(messageParts[1])
 	if err != nil {
 		panic(err)

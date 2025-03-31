@@ -26,7 +26,7 @@ type SelfArgs struct {
 
 // Variáveis globais
 var err error                                      // Armazena o erro
-var knownPeers = make(map[string]peers.PeerStatus) // Hashmap para os peers conhecidos e seus status
+var knownPeers = make(map[string]peers.PeerStatus) // Hashmap com chave sendo o endereço do peer e valor sendo o status (online/offline)
 var myargs SelfArgs                                // Armazena os parâmetros de si mesmo
 var waiting_cli = false                            // Variável para controlar o estado do CLI
 
