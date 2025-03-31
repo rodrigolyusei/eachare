@@ -50,9 +50,10 @@ func main() {
 	err = verifySharedDirectory(myargs.Shared)
 	check(err)
 
+	// Define o endereço para usar nos comandos
 	commands.Address = myargs.FullAddress()
 
-	// Inicializa o servidor
+	// Inicializa o peer
 	listener(myargs)
 }
 
@@ -63,7 +64,7 @@ func check(err error) {
 	}
 }
 
-// Função de teste para simular a execução do programa com argumentos específicos
+// Função para modo de teste, simulando a execução do programa com argumentos específicos
 func testArgs(args []string) (SelfArgs, error) {
 	// Obtém a porta a partir do número no data.txt
 	port, err := number.GetNextPort()
@@ -92,7 +93,7 @@ func testArgs(args []string) (SelfArgs, error) {
 
 // Função para obter os argumentos de entrada
 func getArgs(args []string) (SelfArgs, error) {
-	// Verifica se o número de argumentos é válido e se o formato do endereço e porta está correto
+	// Verifica a quantidade de parâmetros e o formato do endereço
 	if len(args) != 4 {
 		str1 := "\nParâmetros de entrada inválidos, por favor, siga o formato abaixo:"
 		str2 := "\n./eachare <endereço>:<porta> <vizinhos> <diretório compartilhado>"
@@ -103,7 +104,7 @@ func getArgs(args []string) (SelfArgs, error) {
 		return SelfArgs{}, errors.New(str1 + str2)
 	}
 
-	// Se os parâmetros estiverem corretos, retorna cada uma separadamente
+	// Se os parâmetros estiverem corretos, retorna a struct preenchida
 	x := strings.Split(args[1], ":")
 	return SelfArgs{Address: x[0], Port: x[1], Neighbors: args[2], Shared: args[3]}, nil
 }
@@ -160,6 +161,7 @@ func listener(args SelfArgs) {
 
 // Função para lidar com a conexão recebida
 func receiver(conn net.Conn) {
+	// Verifica a conexão
 	if conn == nil {
 		fmt.Println("Conexão inválida")
 		return
@@ -168,9 +170,8 @@ func receiver(conn net.Conn) {
 	defer conn.Close()
 
 	for {
-		// Verifica se a CLI está esperando por uma entrada
+		// Se a CLI está esperando por uma entrada, imprime nova linha para formatação
 		if waiting_cli {
-			// Se sim, imprime uma nova linha para manter a formatação
 			fmt.Println()
 		}
 
@@ -178,25 +179,23 @@ func receiver(conn net.Conn) {
 		buf := make([]byte, 1024)
 		_, err := conn.Read(buf)
 		if err != nil {
-			//fmt.Println("Erro ao ler dados da conexão:", err)
 			break
 		}
-		check(err)
 
 		// Decodifica os dados recebidos em string
 		message := commands.ReceiveMessage(string(buf))
 
 		// Verifica se a mensagem recebida é de um peer conhecido
-		_, exists := knownPeers[message.Origin]
+		status, exists := knownPeers[message.Origin]
 
 		// Mensagem para o caso do peer não ser conhecido ou não estar online
 		if !exists {
 			fmt.Println("\tAdicionando novo peer", message.Origin, "status", peers.ONLINE)
-		} else if knownPeers[message.Origin] == peers.OFFLINE {
+		} else if status == peers.OFFLINE {
 			fmt.Println("\tAtualizando peer", message.Origin, "status", peers.ONLINE)
 		}
 
-		// Adiciona o peer para conhecidos com status ONLINE
+		// Adiciona o peer como conhecido com status ONLINE
 		knownPeers[message.Origin] = peers.ONLINE
 
 		// Lida o comando recebido de acordo com o tipo de mensagem
@@ -204,7 +203,7 @@ func receiver(conn net.Conn) {
 		case commands.HELLO:
 		case commands.GET_PEERS:
 			commands.GetPeersResponse(conn, message, knownPeers)
-		case commands.PEER_LIST:
+		case commands.PEERS_LIST:
 			newPeers := commands.PeerListResponse(message)
 			commands.UpdatePeersMap(knownPeers, newPeers)
 		case commands.BYE:
@@ -214,8 +213,7 @@ func receiver(conn net.Conn) {
 
 		// Verifica se a CLI está esperando por uma entrada
 		if waiting_cli {
-			fmt.Println()
-			fmt.Print("> ")
+			fmt.Print("\n> ")
 		}
 	}
 }
@@ -249,9 +247,7 @@ func cliInterface(args SelfArgs) {
 		case "2":
 			connections := commands.GetPeersRequest(knownPeers)
 			for _, conn := range connections {
-				if conn != nil {
-					go receiver(conn)
-				}
+				go receiver(conn)
 			}
 		case "3":
 			commands.ListLocalFiles(args.Shared)
@@ -262,9 +258,7 @@ func cliInterface(args SelfArgs) {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			fmt.Println("Saindo...")
 			commands.ByeRequest(knownPeers)
-			os.Exit(0)
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
 		}

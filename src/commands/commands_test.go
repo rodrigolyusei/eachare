@@ -77,7 +77,7 @@ func TestSendMessageArgumentsNil(t *testing.T) {
 func TestPeerListReceive(t *testing.T) {
 	message := BaseMessage{
 		Clock:     0,
-		Type:      PEER_LIST,
+		Type:      PEERS_LIST,
 		Arguments: []string{"2", "127.0.0.1:9002:ONLINE:3", "127.0.0.1:9004:ONLINE:0"},
 	}
 
@@ -98,7 +98,7 @@ func TestPeerListReceive(t *testing.T) {
 func TestPeerListResponseOffline(t *testing.T) {
 	message := BaseMessage{
 		Clock:     0,
-		Type:      PEER_LIST,
+		Type:      PEERS_LIST,
 		Arguments: []string{"1", "127.0.0.1:9002:OFFLINE:3"},
 	}
 
@@ -119,7 +119,7 @@ func TestPeerListResponseOffline(t *testing.T) {
 func TestPeerListResponseArgumentsNil(t *testing.T) {
 	message := BaseMessage{
 		Clock:     0,
-		Type:      PEER_LIST,
+		Type:      PEERS_LIST,
 		Arguments: []string{"0"},
 	}
 
@@ -177,7 +177,7 @@ func TestUpdatePeersList(t *testing.T) {
 // 	knowPeers["127.0.0.1:8080"] = peers.ONLINE
 // 	knowPeers["127.0.0.2:8081"] = peers.OFFLINE
 
-// 	expected := "localhost 1 PEER_LIST 2 127.0.0.1:8080:ONLINE:0 127.0.0.2:8081:OFFLINE:0"
+// 	expected := "localhost 1 PEERS_LIST 2 127.0.0.1:8080:ONLINE:0 127.0.0.2:8081:OFFLINE:0"
 
 // 	// Call the function
 // 	GetPeersResponse(conn, receivedMessage, knowPeers)
@@ -213,7 +213,7 @@ func TestGetCommandType(t *testing.T) {
 		expected CommandType
 	}{
 		{"GET_PEERS", GET_PEERS},
-		{"PEER_LIST", PEER_LIST},
+		{"PEERS_LIST", PEERS_LIST},
 		{"UNKNOWN_COMMAND", UNKNOWN},
 	}
 
@@ -231,7 +231,7 @@ func TestCommandTypeString(t *testing.T) {
 		expected string
 	}{
 		{GET_PEERS, "GET_PEERS"},
-		{PEER_LIST, "PEER_LIST"},
+		{PEERS_LIST, "PEERS_LIST"},
 		{UNKNOWN, "UNKNOWN"},
 	}
 

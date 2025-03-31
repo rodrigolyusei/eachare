@@ -10,7 +10,7 @@ const (
 	UNKNOWN CommandType = iota
 	HELLO
 	GET_PEERS
-	PEER_LIST
+	PEERS_LIST
 	BYE
 )
 
@@ -20,8 +20,8 @@ func (ct CommandType) String() string {
 		return "HELLO"
 	case GET_PEERS:
 		return "GET_PEERS"
-	case PEER_LIST:
-		return "PEER_LIST"
+	case PEERS_LIST:
+		return "PEERS_LIST"
 	case BYE:
 		return "BYE"
 	}
@@ -39,8 +39,8 @@ func GetCommandType(s string) CommandType {
 		return HELLO
 	case "GET_PEERS":
 		return GET_PEERS
-	case "PEER_LIST":
-		return PEER_LIST
+	case "PEERS_LIST":
+		return PEERS_LIST
 	case "BYE":
 		return BYE
 	}
