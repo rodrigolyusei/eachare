@@ -15,8 +15,6 @@ import (
 	"EACHare/src/peers"
 )
 
-// Variável para o endereço do peer próprio
-
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
 	if err != nil {

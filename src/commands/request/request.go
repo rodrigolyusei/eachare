@@ -1,5 +1,6 @@
 package request
 
+// Pacotes nativos de go e pacotes internos
 import (
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"EACHare/src/peers"
 )
 
+// Variável para o endereço do peer próprio
 var Address string = "localhost"
 
 // Função para enviar mensagem
@@ -41,29 +43,39 @@ func sendMessage(connection net.Conn, message message.BaseMessage, receiverAddre
 	return err
 }
 
+// Função para criar a mensagem GET_PEERS
 func GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
+	// Cria um slice de conexões e a estrutura da mensagem GET_PEERS
 	connections := make([]net.Conn, 0)
 	baseMessage := message.BaseMessage{Clock: 0, Type: message.GET_PEERS, Arguments: nil}
+
+	// Itera sobre os peers conhecidos
 	for addressPort := range knownPeers {
-		//fmt.Println("Enviando mensagem para ", addressPort)
+		// Tenta estabelecer uma conexão com o peer
 		conn, _ := net.Dial("tcp", addressPort)
 		if conn != nil {
 			connections = append(connections, conn)
 			conn.SetDeadline(time.Now().Add(2 * time.Second))
 		}
+
+		// Envia a mensagem GET_PEERS para e considera diferentes casos
 		err := sendMessage(conn, baseMessage, addressPort)
 		if err != nil {
+			// Se a conexão falhar e o peer estiver ONLINE, atualiza o status para OFFLINE
 			if knownPeers[addressPort] == peers.ONLINE {
 				fmt.Println("\tAtualizando peer " + addressPort + " status OFFLINE")
 				knownPeers[addressPort] = peers.OFFLINE
 			}
 		} else {
+			// Se a conexão for bem-sucedida e o peer estiver OFFLINE, atualiza o status para ONLINE
 			if knownPeers[addressPort] == peers.OFFLINE {
 				fmt.Println("\tAtualizando peer " + addressPort + " status ONLINE")
 				knownPeers[addressPort] = peers.ONLINE
 			}
 		}
 	}
+
+	// Retorna as conexões estabelecidas para criar um receiver para cada um
 	return connections
 }
 
