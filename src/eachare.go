@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"EACHare/src/commands"
+	"EACHare/src/commands/message"
+	"EACHare/src/commands/request"
 	"EACHare/src/number"
 	"EACHare/src/peers"
 )
@@ -51,7 +53,7 @@ func main() {
 	check(err)
 
 	// Define o endereço para usar nos comandos
-	commands.Address = myargs.FullAddress()
+	request.Address = myargs.FullAddress()
 
 	// Inicializa o peer
 	listener(myargs)
@@ -183,32 +185,32 @@ func receiver(conn net.Conn) {
 		}
 
 		// Decodifica os dados recebidos em string
-		message := commands.ReceiveMessage(string(buf))
+		receivedMessage := commands.ReceiveMessage(string(buf))
 
 		// Verifica se a mensagem recebida é de um peer conhecido
-		status, exists := knownPeers[message.Origin]
+		status, exists := knownPeers[receivedMessage.Origin]
 
 		// Mensagem para o caso do peer não ser conhecido ou não estar online
 		if !exists {
-			fmt.Println("\tAdicionando novo peer", message.Origin, "status", peers.ONLINE)
+			fmt.Println("\tAdicionando novo peer", receivedMessage.Origin, "status", peers.ONLINE)
 		} else if status == peers.OFFLINE {
-			fmt.Println("\tAtualizando peer", message.Origin, "status", peers.ONLINE)
+			fmt.Println("\tAtualizando peer", receivedMessage.Origin, "status", peers.ONLINE)
 		}
 
 		// Adiciona o peer como conhecido com status ONLINE
-		knownPeers[message.Origin] = peers.ONLINE
+		knownPeers[receivedMessage.Origin] = peers.ONLINE
 
 		// Lida o comando recebido de acordo com o tipo de mensagem
-		switch message.Type {
-		case commands.HELLO:
-		case commands.GET_PEERS:
-			commands.GetPeersResponse(conn, message, knownPeers)
-		case commands.PEERS_LIST:
-			newPeers := commands.PeerListResponse(message)
+		switch receivedMessage.Type {
+		case message.HELLO:
+		case message.GET_PEERS:
+			commands.GetPeersResponse(conn, receivedMessage, knownPeers)
+		case message.PEERS_LIST:
+			newPeers := commands.PeerListResponse(receivedMessage)
 			commands.UpdatePeersMap(knownPeers, newPeers)
-		case commands.BYE:
-			knownPeers[message.Origin] = peers.OFFLINE
-			fmt.Println("\tAtualizando peer", message.Origin, "status", peers.OFFLINE)
+		case message.BYE:
+			knownPeers[receivedMessage.Origin] = peers.OFFLINE
+			fmt.Println("\tAtualizando peer", receivedMessage.Origin, "status", peers.OFFLINE)
 		}
 
 		// Verifica se a CLI está esperando por uma entrada
@@ -245,7 +247,7 @@ func cliInterface(args SelfArgs) {
 		case "1":
 			commands.ListPeers(knownPeers)
 		case "2":
-			connections := commands.GetPeersRequest(knownPeers)
+			connections := request.GetPeersRequest(knownPeers)
 			for _, conn := range connections {
 				go receiver(conn)
 			}
@@ -258,7 +260,7 @@ func cliInterface(args SelfArgs) {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			commands.ByeRequest(knownPeers)
+			request.ByeRequest(knownPeers)
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
 		}
