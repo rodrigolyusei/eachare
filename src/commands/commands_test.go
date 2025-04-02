@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"EACHare/src/clock"
+	"EACHare/src/commands/message"
 	"EACHare/src/peers"
 	"os"
 	"testing"
@@ -54,30 +54,10 @@ func TestGetSharedDirectory(t *testing.T) {
 // 	}
 // }
 
-func TestSendMessageArgumentsNil(t *testing.T) {
-	clock.ResetClock()
-	conn := &mockConn{}
-	message := BaseMessage{
-		Clock:     0,
-		Type:      UNKNOWN,
-		Arguments: nil,
-	}
-
-	err := sendMessage(conn, message, "")
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	expected := "localhost 1 UNKNOWN"
-	if string(conn.data) != expected {
-		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
-	}
-}
-
 func TestPeerListReceive(t *testing.T) {
-	message := BaseMessage{
+	message := message.BaseMessage{
 		Clock:     0,
-		Type:      PEERS_LIST,
+		Type:      message.PEERS_LIST,
 		Arguments: []string{"2", "127.0.0.1:9002:ONLINE:3", "127.0.0.1:9004:ONLINE:0"},
 	}
 
@@ -96,9 +76,9 @@ func TestPeerListReceive(t *testing.T) {
 }
 
 func TestPeerListResponseOffline(t *testing.T) {
-	message := BaseMessage{
+	message := message.BaseMessage{
 		Clock:     0,
-		Type:      PEERS_LIST,
+		Type:      message.PEERS_LIST,
 		Arguments: []string{"1", "127.0.0.1:9002:OFFLINE:3"},
 	}
 
@@ -117,9 +97,9 @@ func TestPeerListResponseOffline(t *testing.T) {
 }
 
 func TestPeerListResponseArgumentsNil(t *testing.T) {
-	message := BaseMessage{
+	message := message.BaseMessage{
 		Clock:     0,
-		Type:      PEERS_LIST,
+		Type:      message.PEERS_LIST,
 		Arguments: []string{"0"},
 	}
 
@@ -191,54 +171,3 @@ func TestUpdatePeersList(t *testing.T) {
 // 	}
 
 // }
-
-func TestGetPeersRequest(t *testing.T) {
-	// Mock peers
-	knowPeers := make(map[string]peers.PeerStatus)
-	knowPeers["127.0.0.1:8080"] = peers.ONLINE
-	knowPeers["127.0.0.2:8081"] = peers.OFFLINE
-
-	GetPeersRequest(knowPeers)
-
-	for _, peerStatus := range knowPeers {
-		if peerStatus {
-			t.Errorf("Expected peer status to be false, got true")
-		}
-	}
-}
-
-func TestGetCommandType(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected CommandType
-	}{
-		{"GET_PEERS", GET_PEERS},
-		{"PEERS_LIST", PEERS_LIST},
-		{"UNKNOWN_COMMAND", UNKNOWN},
-	}
-
-	for _, test := range tests {
-		result := GetCommandType(test.input)
-		if result != test.expected {
-			t.Errorf("GetCommandType(%s) = %d; expected %d", test.input, result, test.expected)
-		}
-	}
-}
-
-func TestCommandTypeString(t *testing.T) {
-	tests := []struct {
-		input    CommandType
-		expected string
-	}{
-		{GET_PEERS, "GET_PEERS"},
-		{PEERS_LIST, "PEERS_LIST"},
-		{UNKNOWN, "UNKNOWN"},
-	}
-
-	for _, test := range tests {
-		result := test.input.String()
-		if result != test.expected {
-			t.Errorf("CommandType(%d).String() = %s; expected %s", test.input, result, test.expected)
-		}
-	}
-}

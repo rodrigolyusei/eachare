@@ -1,4 +1,4 @@
-package commands
+package message
 
 // Pacotes nativos de go
 import (
@@ -6,11 +6,11 @@ import (
 )
 
 // Tipo int para o comando
-type CommandType uint8
+type MessageType uint8
 
 // Constantes para os tipos de comando, funcionando como um enum
 const (
-	UNKNOWN CommandType = iota
+	UNKNOWN MessageType = iota
 	HELLO
 	GET_PEERS
 	PEERS_LIST
@@ -18,7 +18,7 @@ const (
 )
 
 // Função para converter o tipo de comando em string
-func (ct CommandType) String() string {
+func (ct MessageType) String() string {
 	switch ct {
 	case HELLO:
 		return "HELLO"
@@ -33,8 +33,8 @@ func (ct CommandType) String() string {
 	}
 }
 
-// Função para obter o tipo de comando a partir de uma string
-func GetCommandType(s string) CommandType {
+// Função para obter o tipo de mensagem a partir de uma string
+func GetMessageType(s string) MessageType {
 	s = strings.TrimSpace(s)       // Remove espaços em branco
 	s = strings.Trim(s, "\x00")    // Remove caracteres nulos
 	s = strings.Trim(s, "\r\n\t ") // Remove caracteres de nova linha, tabulação e espaços

@@ -2,29 +2,18 @@ package commands
 
 // Pacotes nativos de go e pacotes internos
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"net"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"EACHare/src/clock"
+	"EACHare/src/commands/message"
+	"EACHare/src/commands/request"
 	"EACHare/src/peers"
 )
-
-// Estrutura para armazenar as informações da mensagem
-type BaseMessage struct {
-	Origin    string
-	Clock     int
-	Type      CommandType
-	Arguments []string
-}
-
-// Variável para o endereço do peer próprio
-var Address string = "localhost"
 
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
@@ -34,35 +23,10 @@ func check(err error) {
 	}
 }
 
-// Função para enviar mensagem
-func sendMessage(connection net.Conn, message BaseMessage, receiverAddress string) error {
-	// Atualiza o clock antes de enviar mensagem
-	message.Clock = clock.UpdateClock()
-
-	// Cria a string do argumento da mensagem enviada
-	arguments := ""
-	if message.Arguments != nil {
-		arguments = " " + strings.Join(message.Arguments, " ")
-	}
-
-	// Cria a string da mensagem inteira e imprime o encaminhamento
-	messageStr := fmt.Sprintf("%s %d %s%s", Address, message.Clock, message.Type.String(), arguments)
-	fmt.Printf("\tEncaminhando mensagem \"%s\" para %s\n", messageStr, receiverAddress)
-
-	// Se a conexão é nula retorna um erro
-	if connection == nil {
-		return errors.New("connection is nil")
-	}
-
-	// Envia a mensagem pela conexão
-	_, err := connection.Write([]byte(messageStr))
-	return err
-}
-
 // Função para receber mensagem
-func ReceiveMessage(message string) BaseMessage {
+func ReceiveMessage(receivedMessage string) message.BaseMessage {
 	// Recupera as partes da mensagem
-	messageParts := strings.Split(message, " ")
+	messageParts := strings.Split(receivedMessage, " ")
 
 	// Guarda o valor do clock da mensagem recebida
 	receivedClock, err := strconv.Atoi(messageParts[1])
@@ -70,11 +34,11 @@ func ReceiveMessage(message string) BaseMessage {
 		panic(err)
 	}
 
-	answer := []string{messageParts[0], strconv.Itoa(receivedClock), GetCommandType(messageParts[2]).String()}
+	answer := []string{messageParts[0], strconv.Itoa(receivedClock), message.GetMessageType(messageParts[2]).String()}
 	answer = append(answer, messageParts[3:]...)
 	receive := strings.Join(answer, " ")
 
-	if strings.Trim(messageParts[2], "\x00") == "HELLO" {
+	if message.GetMessageType(messageParts[2]) == message.HELLO {
 		fmt.Println("\tMensagem recebida: \"" + receive + "\"")
 	} else {
 		fmt.Println("\tResposta recebida: \"" + receive + "\"")
@@ -82,10 +46,10 @@ func ReceiveMessage(message string) BaseMessage {
 
 	clock.UpdateClock()
 
-	return BaseMessage{
+	return message.BaseMessage{
 		Origin:    messageParts[0],
 		Clock:     receivedClock,
-		Type:      GetCommandType(messageParts[2]),
+		Type:      message.GetMessageType(messageParts[2]),
 		Arguments: messageParts[3:],
 	}
 }
@@ -97,52 +61,11 @@ func GetSharedDirectory(sharedPath string) []fs.DirEntry {
 	return entries
 }
 
-func GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
-	connections := make([]net.Conn, 0)
-	baseMessage := BaseMessage{Clock: 0, Type: GET_PEERS, Arguments: nil}
-	for addressPort := range knownPeers {
-		//fmt.Println("Enviando mensagem para ", addressPort)
-		conn, _ := net.Dial("tcp", addressPort)
-		if conn != nil {
-			connections = append(connections, conn)
-			conn.SetDeadline(time.Now().Add(2 * time.Second))
-		}
-		err := sendMessage(conn, baseMessage, addressPort)
-		if err != nil {
-			if knownPeers[addressPort] == peers.ONLINE {
-				fmt.Println("\tAtualizando peer " + addressPort + " status OFFLINE")
-				knownPeers[addressPort] = peers.OFFLINE
-			}
-		} else {
-			if knownPeers[addressPort] == peers.OFFLINE {
-				fmt.Println("\tAtualizando peer " + addressPort + " status ONLINE")
-				knownPeers[addressPort] = peers.ONLINE
-			}
-		}
-	}
-	return connections
+func GetPeersResponse(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
+	request.PeerListRequest(conn, receivedMessage, knownPeers)
 }
 
-func GetPeersResponse(conn net.Conn, receivedMessage BaseMessage, knownPeers map[string]peers.PeerStatus) {
-	peers := []string{}
-
-	size := 0
-	for addressPort, peerStatus := range knownPeers {
-		if addressPort == receivedMessage.Origin {
-			continue
-		}
-		size++
-		peers = append(peers, addressPort+":"+peerStatus.String()+":"+"0")
-	}
-
-	arguments := append([]string{strconv.Itoa(size)}, peers...)
-
-	dropMessage := BaseMessage{Origin: Address, Clock: 0, Type: PEERS_LIST, Arguments: arguments}
-
-	sendMessage(conn, dropMessage, receivedMessage.Origin)
-}
-
-func PeerListResponse(baseMessage BaseMessage) []peers.Peer {
+func PeerListResponse(baseMessage message.BaseMessage) []peers.Peer {
 	peersCount, err := strconv.Atoi(baseMessage.Arguments[0])
 	check(err)
 
@@ -155,25 +78,6 @@ func PeerListResponse(baseMessage BaseMessage) []peers.Peer {
 	}
 
 	return newPeers
-}
-
-func ByeRequest(knownPeers map[string]peers.PeerStatus) {
-	fmt.Println("Saindo...")
-	baseMessage := BaseMessage{Origin: Address, Clock: 0, Type: BYE, Arguments: nil}
-
-	for addressPort := range knownPeers {
-		conn, err := net.Dial("tcp", addressPort)
-		if err == nil {
-			conn.SetDeadline(time.Now().Add(2 * time.Second))
-			defer conn.Close()
-		}
-		err = sendMessage(conn, baseMessage, addressPort)
-		if err != nil {
-			continue
-		}
-	}
-
-	os.Exit(0)
 }
 
 func ListLocalFiles(sharedPath string) {
@@ -210,20 +114,10 @@ func ListPeers(knownPeers map[string]peers.PeerStatus) {
 			return
 		} else if number > 0 && number <= counter {
 			// Enviar mensagem HELLO
-			baseMessage := BaseMessage{Clock: 0, Type: HELLO, Arguments: nil}
-			conn, _ := net.Dial("tcp", addrList[number-1])
-			if conn != nil {
-				defer conn.Close()
+			peerStatus := request.HelloRequest(addrList[number-1])
+			if knownPeers[addrList[number-1]] != peerStatus {
+				fmt.Println("\tAtualizando peer", addrList[number-1], "status", peerStatus.String())
 			}
-			err := sendMessage(conn, baseMessage, addrList[number-1])
-			if err != nil {
-				knownPeers[addrList[number-1]] = peers.OFFLINE
-				fmt.Println("\tAtualizando peer " + addrList[number-1] + " status OFFLINE")
-			} else {
-				knownPeers[addrList[number-1]] = peers.ONLINE
-				fmt.Println("\tAtualizando peer " + addrList[number-1] + " status ONLINE")
-			}
-			return
 		} else {
 			fmt.Println("Opção inválida")
 		}
