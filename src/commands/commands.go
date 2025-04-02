@@ -39,9 +39,9 @@ func ReceiveMessage(receivedMessage string) message.BaseMessage {
 	receive := strings.Join(answer, " ")
 
 	if message.GetMessageType(messageParts[2]) == message.HELLO {
-		logger.ReceiveMessageLog(receive)
+		logger.Info("\tMensagem recebida: \"" + receive + "\"")
 	} else {
-		logger.ReceiveAnswerLog(receive)
+		logger.Info("\tResposta recebida: \"" + receive + "\"")
 	}
 
 	clock.UpdateClock()
@@ -118,7 +118,7 @@ func ListPeers(knownPeers map[string]peers.PeerStatus) {
 			// Enviar mensagem HELLO
 			peerStatus := request.HelloRequest(addrList[number-1])
 			if knownPeers[addrList[number-1]] != peerStatus {
-				logger.UpdatePeerLog(addrList[number-1], peerStatus.String())
+				logger.Info("\tAtualizando peer " + addrList[number-1] + " status " + peerStatus.String())
 			}
 			exit = true
 		} else {
@@ -131,7 +131,7 @@ func UpdatePeersMap(knownPeers map[string]peers.PeerStatus, newPeers []peers.Pee
 	for _, newPeer := range newPeers {
 		_, exists := knownPeers[newPeer.FullAddress()]
 		if !exists {
-			logger.AddPeerLog(newPeer.FullAddress(), newPeer.Status.String())
+			logger.Info("\tAdicionando novo peer " + newPeer.FullAddress() + " status " + newPeer.Status.String())
 			knownPeers[newPeer.FullAddress()] = newPeer.Status
 		}
 	}

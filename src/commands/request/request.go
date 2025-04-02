@@ -23,7 +23,7 @@ func sendMessage(connection net.Conn, message message.BaseMessage, receiverAddre
 	message.Clock = clock.UpdateClock()
 
 	// Imprime o encaminhamento da mensagem
-	logger.MessageForwardingLog(message.String(), receiverAddress)
+	logger.Info("\tEncaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
 
 	// Se a conexão é nula retorna um erro
 	if connection == nil {
@@ -55,13 +55,13 @@ func GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
 		if err != nil {
 			// Se a conexão falhar e o peer estiver ONLINE, atualiza o status para OFFLINE
 			if knownPeers[address] == peers.ONLINE {
-				logger.UpdatePeerLog(address, "OFFLINE")
+				logger.Info("\tAtualizando peer " + address + " status " + peers.OFFLINE.String())
 				knownPeers[address] = peers.OFFLINE
 			}
 		} else {
 			// Se a conexão for bem-sucedida e o peer estiver OFFLINE, atualiza o status para ONLINE
 			if knownPeers[address] == peers.OFFLINE {
-				logger.UpdatePeerLog(address, "ONLINE")
+				logger.Info("\tAtualizando peer " + address + " status " + peers.ONLINE.String())
 				knownPeers[address] = peers.ONLINE
 			}
 		}
@@ -72,7 +72,7 @@ func GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
 }
 
 func ByeRequest(knownPeers map[string]peers.PeerStatus) {
-	logger.ExitLog()
+	logger.Info("\tSaindo...")
 	baseMessage := message.BaseMessage{Origin: Address, Clock: 0, Type: message.BYE, Arguments: nil}
 
 	for addressPort := range knownPeers {

@@ -3,6 +3,7 @@ package clock
 // Pacote nativo de go
 import (
 	"EACHare/src/logger"
+	"strconv"
 )
 
 // Variável para relógio começando com 0
@@ -11,7 +12,7 @@ var clock int = 0
 // Função para incrementar o relógio e imprimir mensagem de atualização
 func UpdateClock() int {
 	clock++
-	logger.UpdateClockLog(clock)
+	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(clock))
 	return clock
 }
 
