@@ -163,11 +163,6 @@ func listener(args SelfArgs) {
 
 // Função para lidar com a conexão recebida
 func receiver(conn net.Conn) {
-	// Verifica a conexão
-	if conn == nil {
-		fmt.Println("Conexão inválida")
-		return
-	}
 	// defer(adia) a função de fechamento da conexão quando as operações terminarem
 	defer conn.Close()
 
