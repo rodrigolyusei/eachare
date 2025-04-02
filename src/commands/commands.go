@@ -34,11 +34,11 @@ func ReceiveMessage(receivedMessage string) message.BaseMessage {
 		panic(err)
 	}
 
-	answer := []string{messageParts[0], strconv.Itoa(receivedClock), GetCommandType(messageParts[2]).String()}
+	answer := []string{messageParts[0], strconv.Itoa(receivedClock), message.GetMessageType(messageParts[2]).String()}
 	answer = append(answer, messageParts[3:]...)
 	receive := strings.Join(answer, " ")
 
-	if strings.Trim(messageParts[2], "\x00") == "HELLO" {
+	if message.GetMessageType(messageParts[2]) == message.HELLO {
 		fmt.Println("\tMensagem recebida: \"" + receive + "\"")
 	} else {
 		fmt.Println("\tResposta recebida: \"" + receive + "\"")

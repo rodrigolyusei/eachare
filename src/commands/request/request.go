@@ -46,7 +46,7 @@ func sendMessage(connection net.Conn, message message.BaseMessage, receiverAddre
 // Função para criar a mensagem GET_PEERS
 func GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
 	// Cria um slice de conexões e a estrutura da mensagem GET_PEERS
-	connections := make([]net.Conn, 0)
+	connections := make([]net.Conn, 0, len(knownPeers))
 	baseMessage := message.BaseMessage{Clock: 0, Type: message.GET_PEERS, Arguments: nil}
 
 	// Itera sobre os peers conhecidos
@@ -99,18 +99,16 @@ func ByeRequest(knownPeers map[string]peers.PeerStatus) {
 }
 
 func PeerListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
-	peers := []string{}
+	peers := make([]string, 0, len(knownPeers))
 
-	size := 0
 	for addressPort, peerStatus := range knownPeers {
 		if addressPort == receivedMessage.Origin {
 			continue
 		}
-		size++
 		peers = append(peers, addressPort+":"+peerStatus.String()+":"+"0")
 	}
 
-	arguments := append([]string{strconv.Itoa(size)}, peers...)
+	arguments := append([]string{strconv.Itoa(len(peers))}, peers...)
 
 	dropMessage := message.BaseMessage{Origin: Address, Clock: 0, Type: message.PEERS_LIST, Arguments: arguments}
 

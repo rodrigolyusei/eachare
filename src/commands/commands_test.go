@@ -171,39 +171,3 @@ func TestUpdatePeersList(t *testing.T) {
 // 	}
 
 // }
-
-func TestGetCommandType(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected CommandType
-	}{
-		{"GET_PEERS", GET_PEERS},
-		{"PEERS_LIST", PEERS_LIST},
-		{"UNKNOWN_COMMAND", UNKNOWN},
-	}
-
-	for _, test := range tests {
-		result := GetCommandType(test.input)
-		if result != test.expected {
-			t.Errorf("GetCommandType(%s) = %d; expected %d", test.input, result, test.expected)
-		}
-	}
-}
-
-func TestCommandTypeString(t *testing.T) {
-	tests := []struct {
-		input    CommandType
-		expected string
-	}{
-		{GET_PEERS, "GET_PEERS"},
-		{PEERS_LIST, "PEERS_LIST"},
-		{UNKNOWN, "UNKNOWN"},
-	}
-
-	for _, test := range tests {
-		result := test.input.String()
-		if result != test.expected {
-			t.Errorf("CommandType(%d).String() = %s; expected %s", test.input, result, test.expected)
-		}
-	}
-}
