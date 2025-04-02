@@ -37,13 +37,16 @@ func changeStdout(t *testing.T, level LogLevel, logFunc func(str string)) bytes.
 }
 
 func TestInfoLog(t *testing.T) {
+	SetLogLevel(ZERO)
 	Info("Hello world!")
 	if infoBuf.String() != "Hello world!\n" {
 		t.Errorf("Expected 'Hello world!', got '%s'", infoBuf.String())
 	}
+	infoBuf.Reset()
 }
 
 func TestDebugLog(t *testing.T) {
+	SetLogLevel(ZERO)
 	Debug("Hello world!")
 	regex := `^\d{2}:\d{2}:\d{2}\.\d{6} \[DEBUG\] Hello world!\n`
 
@@ -54,11 +57,13 @@ func TestDebugLog(t *testing.T) {
 	if !matched {
 		t.Errorf("Log message '%s' does not match expected format", debugBuf.String())
 	}
+	debugBuf.Reset()
 }
 
 func TestErrorLog(t *testing.T) {
+	SetLogLevel(ZERO)
 	Error("Hello world!")
-	regex := `^\d{2}:\d{2}:\d{2}\.\d{6} logger_test.go:29: \[ERROR\] Hello world!\n`
+	regex := `^\d{2}:\d{2}:\d{2}\.\d{6} logger_test.go:65: \[ERROR\] Hello world!\n`
 
 	matched, err := regexp.MatchString(regex, errorBuf.String())
 	if err != nil {
@@ -67,6 +72,7 @@ func TestErrorLog(t *testing.T) {
 	if !matched {
 		t.Errorf("Log message '%s' does not match expected format", errorBuf.String())
 	}
+	errorBuf.Reset()
 }
 
 func TestInfoOutputOk(t *testing.T) {
