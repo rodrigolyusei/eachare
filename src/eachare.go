@@ -163,11 +163,6 @@ func listener(args SelfArgs) {
 
 // Função para lidar com a conexão recebida
 func receiver(conn net.Conn) {
-	// Verifica a conexão
-	if conn == nil {
-		fmt.Println("Conexão inválida")
-		return
-	}
 	// defer(adia) a função de fechamento da conexão quando as operações terminarem
 	defer conn.Close()
 
@@ -222,6 +217,10 @@ func receiver(conn net.Conn) {
 
 // Função para a CLI/menu de interação com o usuário
 func cliInterface(args SelfArgs) {
+	// Variável para armazenar o comando digitado
+	var comm string
+
+	// Loop para manter a CLI ativa
 	for {
 		// Indica que a CLI está esperando por uma entrada
 		waiting_cli = true
@@ -235,10 +234,9 @@ func cliInterface(args SelfArgs) {
 		fmt.Println("\t[5] Exibir estatisticas")
 		fmt.Println("\t[6] Alterar tamanho de chunk")
 		fmt.Println("\t[9] Sair")
-		fmt.Print("> ")
 
 		// Lê a entrada do usuário
-		var comm string
+		fmt.Print("> ")
 		fmt.Scanln(&comm)
 		fmt.Println()
 
