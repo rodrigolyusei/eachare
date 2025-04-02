@@ -21,14 +21,6 @@ func (peer Peer) FullAddress() string {
 	return peer.Address + ":" + peer.Port
 }
 
-// Função para obter o estado do peer, se está online ou offline
-func (peer Peer) GetStatus() string {
-	if peer.Status {
-		return "Online"
-	}
-	return "Offline"
-}
-
 // Função para obter o estado do peer a partir do PeerStatus
 func (s PeerStatus) String() string {
 	if s {

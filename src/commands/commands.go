@@ -12,13 +12,13 @@ import (
 	"EACHare/src/clock"
 	"EACHare/src/commands/message"
 	"EACHare/src/commands/request"
+	"EACHare/src/logger"
 	"EACHare/src/peers"
 )
 
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
 	if err != nil {
-		_ = fmt.Errorf("error: %s", err)
 		panic(err)
 	}
 }
@@ -39,9 +39,9 @@ func ReceiveMessage(receivedMessage string) message.BaseMessage {
 	receive := strings.Join(answer, " ")
 
 	if message.GetMessageType(messageParts[2]) == message.HELLO {
-		fmt.Println("\tMensagem recebida: \"" + receive + "\"")
+		logger.ReceiveMessageLog(receive)
 	} else {
-		fmt.Println("\tResposta recebida: \"" + receive + "\"")
+		logger.ReceiveAnswerLog(receive)
 	}
 
 	clock.UpdateClock()
@@ -102,22 +102,25 @@ func ListPeers(knownPeers map[string]peers.PeerStatus) {
 	}
 
 	var input string
-	for {
+	exit := false
+	for !exit {
 		// Lê a entrada do usuário
 		fmt.Print("> ")
 		fmt.Scanln(&input)
+		fmt.Println()
 		number, err := strconv.Atoi(input)
 		check(err)
 
 		// Envio de mensagem para o destino escolhido
 		if number == 0 {
-			return
+			exit = true
 		} else if number > 0 && number <= counter {
 			// Enviar mensagem HELLO
 			peerStatus := request.HelloRequest(addrList[number-1])
 			if knownPeers[addrList[number-1]] != peerStatus {
-				fmt.Println("\tAtualizando peer", addrList[number-1], "status", peerStatus.String())
+				logger.UpdatePeerLog(addrList[number-1], peerStatus.String())
 			}
+			exit = true
 		} else {
 			fmt.Println("Opção inválida")
 		}
@@ -128,7 +131,7 @@ func UpdatePeersMap(knownPeers map[string]peers.PeerStatus, newPeers []peers.Pee
 	for _, newPeer := range newPeers {
 		_, exists := knownPeers[newPeer.FullAddress()]
 		if !exists {
-			fmt.Println("\tAdicionando novo peer", newPeer.FullAddress(), "status", newPeer.Status)
+			logger.AddPeerLog(newPeer.FullAddress(), newPeer.Status.String())
 			knownPeers[newPeer.FullAddress()] = newPeer.Status
 		}
 	}

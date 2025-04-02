@@ -1,5 +1,6 @@
 package logger
 
+// Pacotes nativos de go
 import (
 	"bytes"
 	"fmt"
@@ -30,6 +31,21 @@ func SetLogLevel(level LogLevel) {
 	logLevel = level
 }
 
+func (l LogLevel) String() string {
+	switch l {
+	case ZERO:
+		return "ZERO"
+	case INFO:
+		return "INFO"
+	case DEBUG:
+		return "DEBUG"
+	case ERROR:
+		return "ERROR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 func init() {
 	infoLogger = log.New(&infoBuf, "", 0)
 	debugLogger = log.New(&debugBuf, "[DEBUG] ", log.Lmicroseconds|log.Lmsgprefix)
@@ -57,20 +73,5 @@ func Error(str string) {
 	if logLevel >= ERROR {
 		fmt.Print(errorBuf.String())
 		errorBuf.Reset()
-	}
-}
-
-func (l LogLevel) String() string {
-	switch l {
-	case ZERO:
-		return "ZERO"
-	case INFO:
-		return "INFO"
-	case DEBUG:
-		return "DEBUG"
-	case ERROR:
-		return "ERROR"
-	default:
-		return "UNKNOWN"
 	}
 }
