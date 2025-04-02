@@ -17,8 +17,19 @@ import (
 // Variável para o endereço do peer próprio
 var Address string = "localhost"
 
+type IRequest interface {
+	GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn
+	ByeRequest(knownPeers map[string]peers.PeerStatus)
+	PeerListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus)
+	HelloRequest(receiverAddress string) peers.PeerStatus
+}
+
+type RequestClient struct {
+	Address string
+}
+
 // Função para enviar mensagem
-func sendMessage(connection net.Conn, message message.BaseMessage, receiverAddress string) error {
+func (r RequestClient) sendMessage(connection net.Conn, message message.BaseMessage, receiverAddress string) error {
 	// Atualiza o clock antes de enviar mensagem
 	message.Clock = clock.UpdateClock()
 
@@ -36,7 +47,7 @@ func sendMessage(connection net.Conn, message message.BaseMessage, receiverAddre
 }
 
 // Função para criar a mensagem GET_PEERS
-func GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
+func (r RequestClient) GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
 	// Cria um slice de conexões e a estrutura da mensagem GET_PEERS
 	connections := make([]net.Conn, 0, len(knownPeers))
 	baseMessage := message.BaseMessage{Origin: Address, Clock: 0, Type: message.GET_PEERS, Arguments: nil}
@@ -51,7 +62,7 @@ func GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
 		}
 
 		// Envia a mensagem GET_PEERS para e considera diferentes casos
-		err := sendMessage(conn, baseMessage, address)
+		err := r.sendMessage(conn, baseMessage, address)
 		if err != nil {
 			// Se a conexão falhar e o peer estiver ONLINE, atualiza o status para OFFLINE
 			if knownPeers[address] == peers.ONLINE {
@@ -71,7 +82,7 @@ func GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
 	return connections
 }
 
-func ByeRequest(knownPeers map[string]peers.PeerStatus) {
+func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) {
 	logger.Info("\tSaindo...")
 	baseMessage := message.BaseMessage{Origin: Address, Clock: 0, Type: message.BYE, Arguments: nil}
 
@@ -90,7 +101,7 @@ func ByeRequest(knownPeers map[string]peers.PeerStatus) {
 	os.Exit(0)
 }
 
-func PeerListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
+func (r RequestClient) PeerListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
 	peers := make([]string, 0, len(knownPeers))
 
 	for addressPort, peerStatus := range knownPeers {
@@ -107,7 +118,7 @@ func PeerListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPe
 	sendMessage(conn, dropMessage, receivedMessage.Origin)
 }
 
-func HelloRequest(receiverAddress string) peers.PeerStatus {
+func (r RequestClient) HelloRequest(receiverAddress string) peers.PeerStatus {
 	baseMessage := message.BaseMessage{Origin: Address, Clock: 0, Type: message.HELLO, Arguments: nil}
 	conn, _ := net.Dial("tcp", receiverAddress)
 	if conn != nil {
