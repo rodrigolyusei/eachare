@@ -57,7 +57,11 @@ func init() {
 }
 
 func SetOutput(w io.Writer) {
-	outputBuf = w
+	if w == nil {
+		outputBuf = os.Stdout
+	} else {
+		outputBuf = w
+	}
 }
 
 func Info(str string) {
