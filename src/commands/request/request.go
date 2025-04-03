@@ -32,7 +32,7 @@ func (r RequestClient) sendMessage(connection net.Conn, message message.BaseMess
 	message.Clock = clock.UpdateClock()
 
 	// Imprime o encaminhamento da mensagem
-	logger.Info("\tEncaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
+	logger.Info("Encaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
 
 	// Se a conexão é nula retorna um erro
 	if connection == nil {
@@ -78,13 +78,13 @@ func (r RequestClient) GetPeersRequest(knownPeers map[string]peers.PeerStatus) [
 		if err != nil {
 			// Se a conexão falhar e o peer estiver ONLINE, atualiza o status para OFFLINE
 			if knownPeers[address] == peers.ONLINE {
-				logger.Info("\tAtualizando peer " + address + " status " + peers.OFFLINE.String())
+				logger.Info("Atualizando peer " + address + " status " + peers.OFFLINE.String())
 				knownPeers[address] = peers.OFFLINE
 			}
 		} else {
 			// Se a conexão for bem-sucedida e o peer estiver OFFLINE, atualiza o status para ONLINE
 			if knownPeers[address] == peers.OFFLINE {
-				logger.Info("\tAtualizando peer " + address + " status " + peers.ONLINE.String())
+				logger.Info("Atualizando peer " + address + " status " + peers.ONLINE.String())
 				knownPeers[address] = peers.ONLINE
 			}
 		}
@@ -116,7 +116,7 @@ func (r RequestClient) PeersListRequest(conn net.Conn, receivedMessage message.B
 // Função para mensagem BYE, avisando os peers sobre a saída
 func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) bool {
 	// Imprime mensagem de saída e cria a mensagem BYE
-	logger.Info("\tSaindo...")
+	logger.Info("Saindo...")
 	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.BYE, Arguments: nil}
 
 	// Itera sobre os peers conhecidos

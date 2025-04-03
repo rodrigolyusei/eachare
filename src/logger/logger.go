@@ -56,11 +56,12 @@ func (l LogLevel) String() string {
 // init() é chamado na execução automaticamente, e aqui define o padrão pro log
 func init() {
 	SetOutput(os.Stdout)
-	infoLogger = log.New(&infoBuf, "", 0)
+	infoLogger = log.New(&infoBuf, "\t", 0)
 	debugLogger = log.New(&debugBuf, "[DEBUG] ", log.Lmicroseconds|log.Lmsgprefix)
 	errorLogger = log.New(&errorBuf, "[ERROR] ", log.Lmicroseconds|log.Lmsgprefix|log.Lshortfile)
 }
 
+// Define a saída padrão para o logger
 func SetOutput(w io.Writer) {
 	if w == nil {
 		outputBuf = os.Stdout
@@ -69,6 +70,7 @@ func SetOutput(w io.Writer) {
 	}
 }
 
+// Funções para logar mensagens de diferentes níveis
 func Info(str string) {
 	infoLogger.Output(2, str)
 	if logLevel >= INFO {

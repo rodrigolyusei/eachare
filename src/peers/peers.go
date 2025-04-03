@@ -30,7 +30,7 @@ func (status PeerStatus) String() string {
 }
 
 // Função para obter o estado do peer a partir de uma string
-func GetPeerStatus(status string) PeerStatus {
+func GetStatus(status string) PeerStatus {
 	if status == "ONLINE" {
 		return ONLINE
 	}

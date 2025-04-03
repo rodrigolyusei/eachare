@@ -14,6 +14,7 @@ import (
 	"EACHare/src/commands"
 	"EACHare/src/commands/message"
 	"EACHare/src/commands/request"
+	"EACHare/src/logger"
 	"EACHare/src/number"
 	"EACHare/src/peers"
 )
@@ -149,11 +150,9 @@ func listener(args SelfArgs, requestClient request.RequestClient) {
 
 	// Loop para receber mensagens de outros peers
 	for {
+		// Accept trava o programa até receber uma conexão
 		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
+		check(err)
 
 		// Cria uma goroutine/thread para lidar com a conexão recebida
 		go receiver(conn, requestClient)
@@ -186,9 +185,9 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 		// Mensagem para o caso do peer não ser conhecido ou não estar online
 		if !exists {
-			fmt.Println("\tAdicionando novo peer", receivedMessage.Origin, "status", peers.ONLINE)
+			logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status ONLINE")
 		} else if status == peers.OFFLINE {
-			fmt.Println("\tAtualizando peer", receivedMessage.Origin, "status", peers.ONLINE)
+			logger.Info("Atualizando peer " + receivedMessage.Origin + " status ONLINE")
 		}
 
 		// Adiciona o peer como conhecido e status ONLINE

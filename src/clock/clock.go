@@ -13,7 +13,7 @@ var clock int = 0
 // Função para incrementar o relógio e imprimir mensagem de atualização
 func UpdateClock() int {
 	clock++
-	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(clock))
+	logger.Info("=> Atualizando relogio para " + strconv.Itoa(clock))
 	return clock
 }
 

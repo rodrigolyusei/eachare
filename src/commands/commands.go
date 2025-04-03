@@ -28,9 +28,9 @@ func ReceiveMessage(receivedMessage string) message.BaseMessage {
 	messageParts := strings.Split(receivedMessage, " ")
 
 	if message.GetMessageType(messageParts[2]) == message.HELLO {
-		logger.Info("\tMensagem recebida: \"" + receivedMessage + "\"")
+		logger.Info("Mensagem recebida: \"" + receivedMessage + "\"")
 	} else {
-		logger.Info("\tResposta recebida: \"" + receivedMessage + "\"")
+		logger.Info("Resposta recebida: \"" + receivedMessage + "\"")
 	}
 
 	// Guarda o valor do clock da mensagem recebida
@@ -65,7 +65,7 @@ func PeersListResponse(baseMessage message.BaseMessage) []peers.Peer {
 	// Para cada peer na mensagem adiciona na lista de peers
 	for i := range peersCount {
 		subMessage := strings.Split(baseMessage.Arguments[1+i], ":")
-		peer := peers.Peer{Address: subMessage[0], Port: subMessage[1], Status: peers.GetPeerStatus(subMessage[2])}
+		peer := peers.Peer{Address: subMessage[0], Port: subMessage[1], Status: peers.GetStatus(subMessage[2])}
 		newPeers[i] = peer
 	}
 
@@ -114,7 +114,7 @@ func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRe
 			// Enviar mensagem HELLO
 			peerStatus := requestClient.HelloRequest(addrList[number-1])
 			if knownPeers[addrList[number-1]] != peerStatus {
-				logger.Info("\tAtualizando peer " + addrList[number-1] + " status " + peerStatus.String())
+				logger.Info("Atualizando peer " + addrList[number-1] + " status " + peerStatus.String())
 			}
 			exit = true
 		} else {
@@ -128,7 +128,7 @@ func UpdatePeersMap(knownPeers map[string]peers.PeerStatus, newPeers []peers.Pee
 	for _, newPeer := range newPeers {
 		_, exists := knownPeers[newPeer.FullAddress()]
 		if !exists {
-			logger.Info("\tAdicionando novo peer " + newPeer.FullAddress() + " status " + newPeer.Status.String())
+			logger.Info("Adicionando novo peer " + newPeer.FullAddress() + " status " + newPeer.Status.String())
 			knownPeers[newPeer.FullAddress()] = newPeer.Status
 		}
 	}
