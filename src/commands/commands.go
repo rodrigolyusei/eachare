@@ -61,8 +61,9 @@ func GetSharedDirectory(sharedPath string) []fs.DirEntry {
 	return entries
 }
 
-func GetPeersResponse(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
-	request.PeerListRequest(conn, receivedMessage, knownPeers)
+func GetPeersResponse(conn net.Conn, receivedMessage message.BaseMessage,
+	knownPeers map[string]peers.PeerStatus, requestClient request.IRequest) {
+	requestClient.PeerListRequest(conn, receivedMessage, knownPeers)
 }
 
 func PeerListResponse(baseMessage message.BaseMessage) []peers.Peer {
@@ -88,7 +89,7 @@ func ListLocalFiles(sharedPath string) {
 	}
 }
 
-func ListPeers(knownPeers map[string]peers.PeerStatus) {
+func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRequest) {
 	fmt.Println("Lista de peers: ")
 	fmt.Println("\t[0] voltar para o menu anterior")
 
@@ -116,7 +117,7 @@ func ListPeers(knownPeers map[string]peers.PeerStatus) {
 			exit = true
 		} else if number > 0 && number <= counter {
 			// Enviar mensagem HELLO
-			peerStatus := request.HelloRequest(addrList[number-1])
+			peerStatus := requestClient.HelloRequest(addrList[number-1])
 			if knownPeers[addrList[number-1]] != peerStatus {
 				logger.Info("\tAtualizando peer " + addrList[number-1] + " status " + peerStatus.String())
 			}

@@ -7,6 +7,12 @@ import (
 	"testing"
 )
 
+var requestClient RequestClient
+
+func init() {
+	requestClient = RequestClient{Address: "localhost"}
+}
+
 func TestSendMessageArgumentsNil(t *testing.T) {
 	clock.ResetClock()
 	conn := &mockConn{}
@@ -16,7 +22,7 @@ func TestSendMessageArgumentsNil(t *testing.T) {
 		Arguments: nil,
 	}
 
-	err := sendMessage(conn, message, "")
+	err := requestClient.sendMessage(conn, message, "")
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -33,7 +39,7 @@ func TestGetPeersRequest(t *testing.T) {
 	knowPeers["127.0.0.1:8080"] = peers.ONLINE
 	knowPeers["127.0.0.2:8081"] = peers.OFFLINE
 
-	GetPeersRequest(knowPeers)
+	requestClient.GetPeersRequest(knowPeers)
 
 	for _, peerStatus := range knowPeers {
 		if peerStatus {
