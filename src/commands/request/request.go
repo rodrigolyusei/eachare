@@ -4,7 +4,6 @@ package request
 import (
 	"errors"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 
 type IRequest interface {
 	GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn
-	ByeRequest(knownPeers map[string]peers.PeerStatus)
+	ByeRequest(knownPeers map[string]peers.PeerStatus) bool
 	PeerListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus)
 	HelloRequest(receiverAddress string) peers.PeerStatus
 }
@@ -79,7 +78,7 @@ func (r RequestClient) GetPeersRequest(knownPeers map[string]peers.PeerStatus) [
 	return connections
 }
 
-func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) {
+func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) bool {
 	logger.Info("\tSaindo...")
 	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.BYE, Arguments: nil}
 
@@ -95,7 +94,7 @@ func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) {
 		}
 	}
 
-	os.Exit(0)
+	return true
 }
 
 func (r RequestClient) PeerListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
