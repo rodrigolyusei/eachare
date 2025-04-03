@@ -14,13 +14,15 @@ import (
 	"EACHare/src/peers"
 )
 
+// Interface para definir os métodos de requisição
 type IRequest interface {
 	GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn
 	ByeRequest(knownPeers map[string]peers.PeerStatus)
-	PeerListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus)
+	PeersListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus)
 	HelloRequest(receiverAddress string) peers.PeerStatus
 }
 
+// Estrutura para o cliente que faz requisições
 type RequestClient struct {
 	Address string
 }
@@ -43,7 +45,21 @@ func (r RequestClient) sendMessage(connection net.Conn, message message.BaseMess
 	return err
 }
 
-// Função para criar a mensagem GET_PEERS
+// Função para mensagem HELLO, avisa o peer que estou online
+func (r RequestClient) HelloRequest(receiverAddress string) peers.PeerStatus {
+	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.HELLO, Arguments: nil}
+	conn, _ := net.Dial("tcp", receiverAddress)
+	if conn != nil {
+		defer conn.Close()
+	}
+	err := r.sendMessage(conn, baseMessage, receiverAddress)
+	if err != nil {
+		return peers.OFFLINE
+	}
+	return peers.ONLINE
+}
+
+// Função para mensagem GET_PEERS, solicita para os vizinhos sobre quem eles conhecem
 func (r RequestClient) GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn {
 	// Cria um slice de conexões e a estrutura da mensagem GET_PEERS
 	connections := make([]net.Conn, 0, len(knownPeers))
@@ -79,28 +95,12 @@ func (r RequestClient) GetPeersRequest(knownPeers map[string]peers.PeerStatus) [
 	return connections
 }
 
-func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) {
-	logger.Info("\tSaindo...")
-	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.BYE, Arguments: nil}
-
-	for addressPort := range knownPeers {
-		conn, err := net.Dial("tcp", addressPort)
-		if err == nil {
-			conn.SetDeadline(time.Now().Add(2 * time.Second))
-			defer conn.Close()
-		}
-		err = r.sendMessage(conn, baseMessage, addressPort)
-		if err != nil {
-			continue
-		}
-	}
-
-	os.Exit(0)
-}
-
-func (r RequestClient) PeerListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
+// Função para mensagem PEER_LIST, envia os meus peers conhecidos para quem solicitou
+func (r RequestClient) PeersListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
+	// Cria uma lista de strings para os peers conhecidos
 	peers := make([]string, 0, len(knownPeers))
 
+	// Adicioona cada peer que conhece na lista, exceto quem pediu a lista
 	for addressPort, peerStatus := range knownPeers {
 		if addressPort == receivedMessage.Origin {
 			continue
@@ -108,22 +108,30 @@ func (r RequestClient) PeerListRequest(conn net.Conn, receivedMessage message.Ba
 		peers = append(peers, addressPort+":"+peerStatus.String()+":"+"0")
 	}
 
+	// Cria uma única string da lista inteira e depois cria e envia a mensagem
 	arguments := append([]string{strconv.Itoa(len(peers))}, peers...)
-
 	dropMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.PEERS_LIST, Arguments: arguments}
-
 	r.sendMessage(conn, dropMessage, receivedMessage.Origin)
 }
 
-func (r RequestClient) HelloRequest(receiverAddress string) peers.PeerStatus {
-	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.HELLO, Arguments: nil}
-	conn, _ := net.Dial("tcp", receiverAddress)
-	if conn != nil {
-		defer conn.Close()
+// Função para mensagem BYE, avisando os peers sobre a saída
+func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) {
+	// Imprime mensagem de saída e cria a mensagem BYE
+	logger.Info("\tSaindo...")
+	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.BYE, Arguments: nil}
+
+	// Itera sobre os peers conhecidos
+	for addressPort := range knownPeers {
+		// Tenta estabelecer uma conexão com o peer
+		conn, err := net.Dial("tcp", addressPort)
+
+		// Se a conexão estabelecida define 2 segundos para o fim da conexão
+		if err == nil {
+			conn.SetDeadline(time.Now().Add(2 * time.Second))
+			defer conn.Close()
+		}
+		r.sendMessage(conn, baseMessage, addressPort)
 	}
-	err := r.sendMessage(conn, baseMessage, receiverAddress)
-	if err != nil {
-		return peers.OFFLINE
-	}
-	return peers.ONLINE
+
+	os.Exit(0)
 }

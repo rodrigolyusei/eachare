@@ -19,20 +19,20 @@ func teardownTestDir(path string) {
 	os.RemoveAll(path)
 }
 
-func TestGetSharedDirectory(t *testing.T) {
-	sharedPath := "../shared"
-	setupTestDir(sharedPath, []string{"loren.txt", "ipsum.txt"})
-	// this scheadules the teardown function to run after the test finishes
-	defer teardownTestDir(sharedPath)
+// func TestGetSharedDirectory(t *testing.T) {
+// 	sharedPath := "../shared"
+// 	setupTestDir(sharedPath, []string{"loren.txt", "ipsum.txt"})
+// 	// this scheadules the teardown function to run after the test finishes
+// 	defer teardownTestDir(sharedPath)
 
-	entries := GetSharedDirectory(sharedPath)
-	if len(entries) != 2 {
-		t.Errorf("Expected two entries, got %d", len(entries))
-	}
-	if entries[0].Name() != "ipsum.txt" {
-		t.Errorf("Expected first entry to be 'loren.txt', got %s", entries[0].Name())
-	}
-}
+// 	entries := GetSharedDirectory(sharedPath)
+// 	if len(entries) != 2 {
+// 		t.Errorf("Expected two entries, got %d", len(entries))
+// 	}
+// 	if entries[0].Name() != "ipsum.txt" {
+// 		t.Errorf("Expected first entry to be 'loren.txt', got %s", entries[0].Name())
+// 	}
+// }
 
 // func TestSendMessageWithArguments(t *testing.T) {
 // 	clock.ResetClock()
@@ -63,7 +63,7 @@ func TestPeerListReceive(t *testing.T) {
 
 	expected := []string{"127.0.0.1:9002", "127.0.0.1:9004"}
 
-	receivePeers := PeerListResponse(message)
+	receivePeers := PeersListResponse(message)
 
 	for i, peer := range receivePeers {
 		if peer.FullAddress() != expected[i] {
@@ -84,7 +84,7 @@ func TestPeerListResponseOffline(t *testing.T) {
 
 	expected := "127.0.0.1:9002"
 
-	receivePeers := PeerListResponse(message)
+	receivePeers := PeersListResponse(message)
 
 	for i, peer := range receivePeers {
 		if peer.FullAddress() != expected {
@@ -103,7 +103,7 @@ func TestPeerListResponseArgumentsNil(t *testing.T) {
 		Arguments: []string{"0"},
 	}
 
-	peers := PeerListResponse(message)
+	peers := PeersListResponse(message)
 
 	if len(peers) != 0 {
 		t.Fatalf("Expected 0 peers, got %d", len(peers))

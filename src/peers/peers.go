@@ -9,30 +9,29 @@ const (
 	OFFLINE PeerStatus = false
 )
 
-// Estrutura para armazenar informações do peer conhecidos
+// Estrutura para armazenar informações do peer conhecido
 type Peer struct {
 	Address string
 	Port    string
 	Status  PeerStatus
 }
 
-// Função para obter o endereço completo do peer, diferente do peer próprio
+// Função para obter o endereço completo a partir do Peer
 func (peer Peer) FullAddress() string {
 	return peer.Address + ":" + peer.Port
 }
 
 // Função para obter o estado do peer a partir do PeerStatus
-func (s PeerStatus) String() string {
-	if s {
+func (status PeerStatus) String() string {
+	if status {
 		return "ONLINE"
 	}
 	return "OFFLINE"
 }
 
 // Função para obter o estado do peer a partir de uma string
-func GetPeerStatus(s string) PeerStatus {
-	switch s {
-	case "ONLINE":
+func GetPeerStatus(status string) PeerStatus {
+	if status == "ONLINE" {
 		return ONLINE
 	}
 	return OFFLINE

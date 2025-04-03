@@ -1,9 +1,10 @@
 package clock
 
-// Pacote nativo de go
+// Pacote nativo de go e pacote interno
 import (
-	"EACHare/src/logger"
 	"strconv"
+
+	"EACHare/src/logger"
 )
 
 // Variável para relógio começando com 0

@@ -1,5 +1,6 @@
 package message
 
+// Pacotes nativos de go
 import (
 	"strconv"
 	"strings"

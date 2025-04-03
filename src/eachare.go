@@ -119,8 +119,8 @@ func addNeighbors(neighborsPath string) error {
 	}
 
 	// Separa os vizinhos por linhas
-	neighbors := strings.Split(string(neighborsFile), "\n")
-	for _, neighbor := range neighbors {
+	neighbors := strings.SplitSeq(string(neighborsFile), "\n")
+	for neighbor := range neighbors {
 		knownPeers[neighbor] = peers.OFFLINE
 	}
 	return nil
@@ -191,7 +191,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 			fmt.Println("\tAtualizando peer", receivedMessage.Origin, "status", peers.ONLINE)
 		}
 
-		// Adiciona o peer como conhecido com status ONLINE
+		// Adiciona o peer como conhecido e status ONLINE
 		knownPeers[receivedMessage.Origin] = peers.ONLINE
 
 		// Lida o comando recebido de acordo com o tipo de mensagem
@@ -200,7 +200,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 		case message.GET_PEERS:
 			commands.GetPeersResponse(conn, receivedMessage, knownPeers, requestClient)
 		case message.PEERS_LIST:
-			newPeers := commands.PeerListResponse(receivedMessage)
+			newPeers := commands.PeersListResponse(receivedMessage)
 			commands.UpdatePeersMap(knownPeers, newPeers)
 		case message.BYE:
 			knownPeers[receivedMessage.Origin] = peers.OFFLINE
