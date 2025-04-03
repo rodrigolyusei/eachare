@@ -257,7 +257,10 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			requestClient.ByeRequest(knownPeers)
+			canLeave := requestClient.ByeRequest(knownPeers)
+			if canLeave {
+				os.Exit(0)
+			}
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
 		}

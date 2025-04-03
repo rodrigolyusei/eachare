@@ -3,8 +3,9 @@ package logger
 // Pacotes nativos de go
 import (
 	"bytes"
-	"fmt"
+	"io"
 	"log"
+	"os"
 )
 
 // Define uma int para o nível de log
@@ -28,7 +29,7 @@ var debugLogger *log.Logger
 var errorBuf bytes.Buffer
 var errorLogger *log.Logger
 
-// logLevel recebe 1 de ínicio
+var outputBuf io.Writer
 var logLevel = INFO
 
 // Setter para o logLevel
@@ -54,16 +55,24 @@ func (l LogLevel) String() string {
 
 // init() é chamado na execução automaticamente, e aqui define o padrão pro log
 func init() {
+	SetOutput(os.Stdout)
 	infoLogger = log.New(&infoBuf, "", 0)
 	debugLogger = log.New(&debugBuf, "[DEBUG] ", log.Lmicroseconds|log.Lmsgprefix)
 	errorLogger = log.New(&errorBuf, "[ERROR] ", log.Lmicroseconds|log.Lmsgprefix|log.Lshortfile)
 }
 
-// Funções a serem usadas no programa para inmprimir cada tipo de mensagem
+func SetOutput(w io.Writer) {
+	if w == nil {
+		outputBuf = os.Stdout
+	} else {
+		outputBuf = w
+	}
+}
+
 func Info(str string) {
 	infoLogger.Output(2, str)
 	if logLevel >= INFO {
-		fmt.Print(infoBuf.String())
+		outputBuf.Write(infoBuf.Bytes())
 		infoBuf.Reset()
 	}
 }
@@ -71,7 +80,7 @@ func Info(str string) {
 func Debug(str string) {
 	debugLogger.Output(2, str)
 	if logLevel >= DEBUG {
-		fmt.Print(debugBuf.String())
+		outputBuf.Write(debugBuf.Bytes())
 		debugBuf.Reset()
 	}
 }
@@ -79,7 +88,7 @@ func Debug(str string) {
 func Error(str string) {
 	errorLogger.Output(2, str)
 	if logLevel >= ERROR {
-		fmt.Print(errorBuf.String())
+		outputBuf.Write(errorBuf.Bytes())
 		errorBuf.Reset()
 	}
 }

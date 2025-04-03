@@ -4,7 +4,6 @@ package request
 import (
 	"errors"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 // Interface para definir os métodos de requisição
 type IRequest interface {
 	GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn
-	ByeRequest(knownPeers map[string]peers.PeerStatus)
+	ByeRequest(knownPeers map[string]peers.PeerStatus) bool
 	PeersListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus)
 	HelloRequest(receiverAddress string) peers.PeerStatus
 }
@@ -115,7 +114,7 @@ func (r RequestClient) PeersListRequest(conn net.Conn, receivedMessage message.B
 }
 
 // Função para mensagem BYE, avisando os peers sobre a saída
-func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) {
+func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) bool {
 	// Imprime mensagem de saída e cria a mensagem BYE
 	logger.Info("\tSaindo...")
 	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.BYE, Arguments: nil}
@@ -133,5 +132,5 @@ func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) {
 		r.sendMessage(conn, baseMessage, addressPort)
 	}
 
-	os.Exit(0)
+	return true
 }
