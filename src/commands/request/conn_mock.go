@@ -1,7 +1,9 @@
 package request
 
 import (
+	"errors"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -14,6 +16,9 @@ func (m *mockConn) Read(b []byte) (n int, err error) {
 }
 
 func (m *mockConn) Write(b []byte) (n int, err error) {
+	if strings.Contains(string(b), "testingWriteError") {
+		return 0, errors.New("write error")
+	}
 	m.data = append(m.data, b...)
 	return len(b), nil
 }
