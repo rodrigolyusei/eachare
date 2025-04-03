@@ -8,10 +8,10 @@ import (
 	"os"
 )
 
-// Define uma int para o nível de log
-type LogLevel int
+// Define uma int para o nível do log
+type LogLevel uint8
 
-// Define uma enum para os níveis
+// Define uma enum para os níveis do log
 const (
 	ZERO LogLevel = iota
 	INFO

@@ -28,10 +28,8 @@ type RequestClient struct {
 
 // Função para enviar mensagem
 func (r RequestClient) sendMessage(connection net.Conn, message message.BaseMessage, receiverAddress string) error {
-	// Atualiza o clock antes de enviar mensagem
+	// Atualiza o clock e mostra o encaminhamento
 	message.Clock = clock.UpdateClock()
-
-	// Imprime o encaminhamento da mensagem
 	logger.Info("Encaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
 
 	// Se a conexão é nula retorna um erro
@@ -66,7 +64,7 @@ func (r RequestClient) GetPeersRequest(knownPeers map[string]peers.PeerStatus) [
 
 	// Itera sobre os peers conhecidos
 	for address := range knownPeers {
-		// Tenta estabelecer uma conexão com o peer
+		// Tenta conectar e se conectar, adiciona a conexão à lista e define o deadline de 2 segundos
 		conn, _ := net.Dial("tcp", address)
 		if conn != nil {
 			connections = append(connections, conn)
@@ -121,11 +119,9 @@ func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) bool {
 
 	// Itera sobre os peers conhecidos
 	for addressPort := range knownPeers {
-		// Tenta estabelecer uma conexão com o peer
-		conn, err := net.Dial("tcp", addressPort)
-
-		// Se a conexão estabelecida define 2 segundos para o fim da conexão
-		if err == nil {
+		// Tenta conectar e se conectar define o deadline de 2 segundos
+		conn, _ := net.Dial("tcp", addressPort)
+		if conn != nil {
 			conn.SetDeadline(time.Now().Add(2 * time.Second))
 			defer conn.Close()
 		}

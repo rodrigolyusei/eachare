@@ -27,16 +27,17 @@ func ReceiveMessage(receivedMessage string) message.BaseMessage {
 	// Recupera as partes da mensagem
 	messageParts := strings.Split(receivedMessage, " ")
 
-	if message.GetMessageType(messageParts[2]) == message.HELLO {
-		logger.Info("Mensagem recebida: \"" + receivedMessage + "\"")
-	} else {
+	// Imprime a mensagem/resposta recebida e atualiza o clock
+	if messageParts[2] == "PEERS_LIST" {
 		logger.Info("Resposta recebida: \"" + receivedMessage + "\"")
+	} else {
+		logger.Info("Mensagem recebida: \"" + receivedMessage + "\"")
 	}
+	clock.UpdateClock()
 
 	// Guarda o valor do clock da mensagem recebida
 	receivedClock, err := strconv.Atoi(messageParts[1])
 	check(err)
-	clock.UpdateClock()
 
 	// Monta a mensagem e retorna ela
 	return message.BaseMessage{
