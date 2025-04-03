@@ -124,7 +124,7 @@ func TestPeerListRequest(t *testing.T) {
 	}
 	mockConn := &mockConn{}
 
-	requestClient.PeerListRequest(mockConn, receivedMessage, knownPeers)
+	requestClient.PeersListRequest(mockConn, receivedMessage, knownPeers)
 
 	output := string(mockConn.data)
 	expected := `localhost 1 PEERS_LIST 1 127.0.0.2:9002:OFFLINE:0`

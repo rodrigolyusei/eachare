@@ -14,6 +14,7 @@ import (
 	"EACHare/src/commands"
 	"EACHare/src/commands/message"
 	"EACHare/src/commands/request"
+	"EACHare/src/logger"
 	"EACHare/src/number"
 	"EACHare/src/peers"
 )
@@ -119,8 +120,8 @@ func addNeighbors(neighborsPath string) error {
 	}
 
 	// Separa os vizinhos por linhas
-	neighbors := strings.Split(string(neighborsFile), "\n")
-	for _, neighbor := range neighbors {
+	neighbors := strings.SplitSeq(string(neighborsFile), "\n")
+	for neighbor := range neighbors {
 		knownPeers[neighbor] = peers.OFFLINE
 	}
 	return nil
@@ -149,11 +150,9 @@ func listener(args SelfArgs, requestClient request.RequestClient) {
 
 	// Loop para receber mensagens de outros peers
 	for {
+		// Accept trava o programa até receber uma conexão
 		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
+		check(err)
 
 		// Cria uma goroutine/thread para lidar com a conexão recebida
 		go receiver(conn, requestClient)
@@ -186,12 +185,12 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 		// Mensagem para o caso do peer não ser conhecido ou não estar online
 		if !exists {
-			fmt.Println("\tAdicionando novo peer", receivedMessage.Origin, "status", peers.ONLINE)
+			logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status ONLINE")
 		} else if status == peers.OFFLINE {
-			fmt.Println("\tAtualizando peer", receivedMessage.Origin, "status", peers.ONLINE)
+			logger.Info("Atualizando peer " + receivedMessage.Origin + " status ONLINE")
 		}
 
-		// Adiciona o peer como conhecido com status ONLINE
+		// Adiciona o peer como conhecido e status ONLINE
 		knownPeers[receivedMessage.Origin] = peers.ONLINE
 
 		// Lida o comando recebido de acordo com o tipo de mensagem
@@ -200,7 +199,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 		case message.GET_PEERS:
 			commands.GetPeersResponse(conn, receivedMessage, knownPeers, requestClient)
 		case message.PEERS_LIST:
-			newPeers := commands.PeerListResponse(receivedMessage)
+			newPeers := commands.PeersListResponse(receivedMessage)
 			commands.UpdatePeersMap(knownPeers, newPeers)
 		case message.BYE:
 			knownPeers[receivedMessage.Origin] = peers.OFFLINE

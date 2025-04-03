@@ -3,7 +3,6 @@ package commands
 // Pacotes nativos de go e pacotes internos
 import (
 	"fmt"
-	"io/fs"
 	"net"
 	"os"
 	"strconv"
@@ -28,24 +27,19 @@ func ReceiveMessage(receivedMessage string) message.BaseMessage {
 	// Recupera as partes da mensagem
 	messageParts := strings.Split(receivedMessage, " ")
 
-	// Guarda o valor do clock da mensagem recebida
-	receivedClock, err := strconv.Atoi(messageParts[1])
-	if err != nil {
-		panic(err)
-	}
-
-	answer := []string{messageParts[0], strconv.Itoa(receivedClock), message.GetMessageType(messageParts[2]).String()}
-	answer = append(answer, messageParts[3:]...)
-	receive := strings.Join(answer, " ")
-
-	if message.GetMessageType(messageParts[2]) == message.HELLO {
-		logger.Info("\tMensagem recebida: \"" + receive + "\"")
+	// Imprime a mensagem/resposta recebida e atualiza o clock
+	if messageParts[2] == "PEERS_LIST" {
+		logger.Info("Resposta recebida: \"" + receivedMessage + "\"")
 	} else {
-		logger.Info("\tResposta recebida: \"" + receive + "\"")
+		logger.Info("Mensagem recebida: \"" + receivedMessage + "\"")
 	}
-
 	clock.UpdateClock()
 
+	// Guarda o valor do clock da mensagem recebida
+	receivedClock, err := strconv.Atoi(messageParts[1])
+	check(err)
+
+	// Monta a mensagem e retorna ela
 	return message.BaseMessage{
 		Origin:    messageParts[0],
 		Clock:     receivedClock,
@@ -54,34 +48,35 @@ func ReceiveMessage(receivedMessage string) message.BaseMessage {
 	}
 }
 
-func GetSharedDirectory(sharedPath string) []fs.DirEntry {
-	entries, err := os.ReadDir(sharedPath)
-	check(err)
-
-	return entries
-}
-
+// Função para responder ao get peers recebido
 func GetPeersResponse(conn net.Conn, receivedMessage message.BaseMessage,
 	knownPeers map[string]peers.PeerStatus, requestClient request.IRequest) {
-	requestClient.PeerListRequest(conn, receivedMessage, knownPeers)
+	requestClient.PeersListRequest(conn, receivedMessage, knownPeers)
 }
 
-func PeerListResponse(baseMessage message.BaseMessage) []peers.Peer {
+// Função para responder ao peers list recebido
+func PeersListResponse(baseMessage message.BaseMessage) []peers.Peer {
+	// Conta quantos peers foram recebidos na mensagem
 	peersCount, err := strconv.Atoi(baseMessage.Arguments[0])
 	check(err)
 
+	// Cria um lista de peers com o tamanho correto
 	newPeers := make([]peers.Peer, peersCount)
 
+	// Para cada peer na mensagem adiciona na lista de peers
 	for i := range peersCount {
 		subMessage := strings.Split(baseMessage.Arguments[1+i], ":")
-		peer := peers.Peer{Address: subMessage[0], Port: subMessage[1], Status: peers.GetPeerStatus(subMessage[2])}
+		peer := peers.Peer{Address: subMessage[0], Port: subMessage[1], Status: peers.GetStatus(subMessage[2])}
 		newPeers[i] = peer
 	}
 
+	// Retorna a lista de peers
 	return newPeers
 }
 
+// Função para listar os arquivos do diretório compartilhado
 func ListLocalFiles(sharedPath string) {
+	// Lê o diretório e imprime os arquivos
 	entries, err := os.ReadDir(sharedPath)
 	check(err)
 	for _, entry := range entries {
@@ -89,6 +84,7 @@ func ListLocalFiles(sharedPath string) {
 	}
 }
 
+// Função para listar os peers conhecidos e enviar HELLO para o peer escolhido
 func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRequest) {
 	fmt.Println("Lista de peers: ")
 	fmt.Println("\t[0] voltar para o menu anterior")
@@ -119,7 +115,7 @@ func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRe
 			// Enviar mensagem HELLO
 			peerStatus := requestClient.HelloRequest(addrList[number-1])
 			if knownPeers[addrList[number-1]] != peerStatus {
-				logger.Info("\tAtualizando peer " + addrList[number-1] + " status " + peerStatus.String())
+				logger.Info("Atualizando peer " + addrList[number-1] + " status " + peerStatus.String())
 			}
 			exit = true
 		} else {
@@ -128,11 +124,12 @@ func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRe
 	}
 }
 
+// Função para atualizar o mapa de peers conhecidos pela lista recebida
 func UpdatePeersMap(knownPeers map[string]peers.PeerStatus, newPeers []peers.Peer) {
 	for _, newPeer := range newPeers {
 		_, exists := knownPeers[newPeer.FullAddress()]
 		if !exists {
-			logger.Info("\tAdicionando novo peer " + newPeer.FullAddress() + " status " + newPeer.Status.String())
+			logger.Info("Adicionando novo peer " + newPeer.FullAddress() + " status " + newPeer.Status.String())
 			knownPeers[newPeer.FullAddress()] = newPeer.Status
 		}
 	}
