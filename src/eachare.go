@@ -48,15 +48,14 @@ func main() {
 		check(err)
 	}
 
+	requestClient := request.RequestClient{Address: myargs.FullAddress()}
+
 	// Verifica o diretório compartilhado
 	err = verifySharedDirectory(myargs.Shared)
 	check(err)
 
-	// Define o endereço para usar nos comandos
-	request.Address = myargs.FullAddress()
-
 	// Inicializa o peer
-	listener(myargs)
+	listener(myargs, requestClient)
 }
 
 // Função para verificar e imprimir mensagem de erro
@@ -139,14 +138,14 @@ func (args SelfArgs) FullAddress() string {
 }
 
 // Função para iniciar o peer e escutar conexões
-func listener(args SelfArgs) {
+func listener(args SelfArgs, requestClient request.RequestClient) {
 	// Cria um listener TCP no endereço e porta especificado
 	listener, err := net.Listen("tcp", args.FullAddress())
 	check(err)
 	defer listener.Close()
 
 	// Cria uma goroutine/thread para a CLI
-	go cliInterface(args)
+	go cliInterface(args, requestClient)
 
 	// Loop para receber mensagens de outros peers
 	for {
@@ -157,12 +156,12 @@ func listener(args SelfArgs) {
 		}
 
 		// Cria uma goroutine/thread para lidar com a conexão recebida
-		go receiver(conn)
+		go receiver(conn, requestClient)
 	}
 }
 
 // Função para lidar com a conexão recebida
-func receiver(conn net.Conn) {
+func receiver(conn net.Conn, requestClient request.RequestClient) {
 	// defer(adia) a função de fechamento da conexão quando as operações terminarem
 	defer conn.Close()
 
@@ -199,7 +198,7 @@ func receiver(conn net.Conn) {
 		switch receivedMessage.Type {
 		case message.HELLO:
 		case message.GET_PEERS:
-			commands.GetPeersResponse(conn, receivedMessage, knownPeers)
+			commands.GetPeersResponse(conn, receivedMessage, knownPeers, requestClient)
 		case message.PEERS_LIST:
 			newPeers := commands.PeerListResponse(receivedMessage)
 			commands.UpdatePeersMap(knownPeers, newPeers)
@@ -216,7 +215,7 @@ func receiver(conn net.Conn) {
 }
 
 // Função para a CLI/menu de interação com o usuário
-func cliInterface(args SelfArgs) {
+func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 	// Variável para armazenar o comando digitado
 	var comm string
 
@@ -243,11 +242,11 @@ func cliInterface(args SelfArgs) {
 		// Executa o comando correspondente
 		switch comm {
 		case "1":
-			commands.ListPeers(knownPeers)
+			commands.ListPeers(knownPeers, requestClient)
 		case "2":
-			connections := request.GetPeersRequest(knownPeers)
+			connections := requestClient.GetPeersRequest(knownPeers)
 			for _, conn := range connections {
-				go receiver(conn)
+				go receiver(conn, requestClient)
 			}
 		case "3":
 			commands.ListLocalFiles(args.Shared)
@@ -258,7 +257,7 @@ func cliInterface(args SelfArgs) {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			request.ByeRequest(knownPeers)
+			requestClient.ByeRequest(knownPeers)
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
 		}
