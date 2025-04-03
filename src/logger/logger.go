@@ -32,6 +32,13 @@ var errorLogger *log.Logger
 var outputBuf io.Writer
 var logLevel = INFO
 
+type LogMessage struct {
+	Level   LogLevel
+	Message string
+}
+
+var logQueue = make(chan LogMessage, 100)
+
 // Setter para o logLevel
 func SetLogLevel(level LogLevel) {
 	logLevel = level
@@ -56,9 +63,19 @@ func (l LogLevel) String() string {
 // init() é chamado na execução automaticamente, e aqui define o padrão pro log
 func init() {
 	SetOutput(os.Stdout)
+
+	go ConsumeLogQueue(logQueue)
+
 	infoLogger = log.New(&infoBuf, "\t", 0)
 	debugLogger = log.New(&debugBuf, "[DEBUG] ", log.Lmicroseconds|log.Lmsgprefix)
 	errorLogger = log.New(&errorBuf, "[ERROR] ", log.Lmicroseconds|log.Lmsgprefix|log.Lshortfile)
+}
+
+func ConsumeLogQueue(ch chan LogMessage) {
+	for {
+		logMessage := <-ch
+		outputBuf.Write([]byte(logMessage.Message))
+	}
 }
 
 // Define a saída padrão para o logger
@@ -74,7 +91,7 @@ func SetOutput(w io.Writer) {
 func Info(str string) {
 	infoLogger.Output(2, str)
 	if logLevel >= INFO {
-		outputBuf.Write(infoBuf.Bytes())
+		logQueue <- LogMessage{Level: INFO, Message: infoBuf.String()}
 		infoBuf.Reset()
 	}
 }
@@ -82,7 +99,7 @@ func Info(str string) {
 func Debug(str string) {
 	debugLogger.Output(2, str)
 	if logLevel >= DEBUG {
-		outputBuf.Write(debugBuf.Bytes())
+		logQueue <- LogMessage{Level: DEBUG, Message: infoBuf.String()}
 		debugBuf.Reset()
 	}
 }
@@ -90,7 +107,7 @@ func Debug(str string) {
 func Error(str string) {
 	errorLogger.Output(2, str)
 	if logLevel >= ERROR {
-		outputBuf.Write(errorBuf.Bytes())
+		logQueue <- LogMessage{Level: ERROR, Message: infoBuf.String()}
 		errorBuf.Reset()
 	}
 }
