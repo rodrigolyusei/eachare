@@ -125,7 +125,7 @@ func addNeighbors(neighborsPath string) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		knownPeers[scanner.Text()] = peers.OFFLINE
-		fmt.Println("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String())
+		logger.Info("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String())
 	}
 	return nil
 }
@@ -185,9 +185,9 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 	// Mensagem para o caso do peer não ser conhecido ou não estar online
 	if !exists {
-		logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+		logger.Info("\tAdicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 	} else if status == peers.OFFLINE && receivedMessage.Type != message.BYE {
-		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+		logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 	}
 
 	// Adiciona o peer como conhecido e status ONLINE
@@ -211,11 +211,12 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 // Função para a CLI/menu de interação com o usuário
 func cliInterface(args SelfArgs, requestClient request.RequestClient) {
-	// Variável para armazenar o comando digitado
+	// Variável para o comando digitado e a saída
 	var comm string
+	var exit bool = false
 
 	// Loop para manter a CLI ativa
-	for {
+	for !exit {
 		// Indica que a CLI está esperando por uma entrada
 		waiting_cli = true
 
@@ -252,10 +253,7 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			canLeave := requestClient.ByeRequest(knownPeers)
-			if canLeave {
-				os.Exit(0)
-			}
+			requestClient.ByeRequest(knownPeers, &exit)
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
 		}
@@ -264,4 +262,7 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 		waiting_cli = false
 		time.Sleep(500 * time.Millisecond)
 	}
+
+	// Encerra o programa
+	os.Exit(0)
 }

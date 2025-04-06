@@ -24,7 +24,7 @@ func UpdateClock() int {
 	defer safeClock.Mutex.Unlock()
 
 	safeClock.Clock++
-	logger.Info("=> Atualizando relogio para " + strconv.Itoa(safeClock.Clock))
+	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(safeClock.Clock))
 	return safeClock.Clock
 }
 
