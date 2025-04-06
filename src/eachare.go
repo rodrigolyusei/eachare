@@ -185,9 +185,9 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 		// Mensagem para o caso do peer não ser conhecido ou não estar online
 		if !exists {
-			logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status ONLINE")
+			logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 		} else if status == peers.OFFLINE {
-			logger.Info("Atualizando peer " + receivedMessage.Origin + " status ONLINE")
+			logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 		}
 
 		// Adiciona o peer como conhecido e status ONLINE
@@ -199,11 +199,10 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 		case message.GET_PEERS:
 			commands.GetPeersResponse(conn, receivedMessage, knownPeers, requestClient)
 		case message.PEERS_LIST:
-			newPeers := commands.PeersListResponse(receivedMessage)
-			commands.UpdatePeersMap(knownPeers, newPeers)
+			commands.PeersListResponse(receivedMessage, knownPeers)
 		case message.BYE:
 			knownPeers[receivedMessage.Origin] = peers.OFFLINE
-			fmt.Println("\tAtualizando peer", receivedMessage.Origin, "status", peers.OFFLINE)
+			logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
 		}
 
 		// Verifica se a CLI está esperando por uma entrada

@@ -55,69 +55,14 @@ func teardownTestDir(path string) {
 // }
 
 func TestPeerListReceive(t *testing.T) {
-	message := message.BaseMessage{
-		Clock:     0,
-		Type:      message.PEERS_LIST,
-		Arguments: []string{"2", "127.0.0.1:9002:ONLINE:3", "127.0.0.1:9004:ONLINE:0"},
-	}
-
-	expected := []string{"127.0.0.1:9002", "127.0.0.1:9004"}
-
-	receivePeers := PeersListResponse(message)
-
-	for i, peer := range receivePeers {
-		if peer.FullAddress() != expected[i] {
-			t.Fatalf("Expected %s, got %s", message.Arguments[i], peer.FullAddress())
-		}
-		if peer.Status != peers.ONLINE {
-			t.Fatalf("Expected ONLINE, got %s", peer.Status)
-		}
-	}
-}
-
-func TestPeerListResponseOffline(t *testing.T) {
-	message := message.BaseMessage{
-		Clock:     0,
-		Type:      message.PEERS_LIST,
-		Arguments: []string{"1", "127.0.0.1:9002:OFFLINE:3"},
-	}
-
-	expected := "127.0.0.1:9002"
-
-	receivePeers := PeersListResponse(message)
-
-	for i, peer := range receivePeers {
-		if peer.FullAddress() != expected {
-			t.Fatalf("Expected %s, got %s", message.Arguments[i], peer.FullAddress())
-		}
-		if peer.Status != peers.OFFLINE {
-			t.Fatalf("Expected OFFLINE, got %s", peer.Status)
-		}
-	}
-}
-
-func TestPeerListResponseArgumentsNil(t *testing.T) {
-	message := message.BaseMessage{
-		Clock:     0,
-		Type:      message.PEERS_LIST,
-		Arguments: []string{"0"},
-	}
-
-	peers := PeersListResponse(message)
-
-	if len(peers) != 0 {
-		t.Fatalf("Expected 0 peers, got %d", len(peers))
-	}
-}
-
-func TestUpdatePeersList(t *testing.T) {
 	initialPeers := make(map[string]peers.PeerStatus)
 	initialPeers["127.0.0.1:9001"] = peers.ONLINE
 	initialPeers["127.0.0.1:9002"] = peers.OFFLINE
 
-	newPeers := []peers.Peer{
-		{Address: "127.0.0.1", Port: "9001", Status: peers.OFFLINE},
-		{Address: "127.0.0.1", Port: "9003", Status: peers.ONLINE},
+	message := message.BaseMessage{
+		Clock:     0,
+		Type:      message.PEERS_LIST,
+		Arguments: []string{"2", "127.0.0.1:9002:ONLINE:3", "127.0.0.1:9003:ONLINE:0"},
 	}
 
 	expectedPeers := []peers.Peer{
@@ -126,17 +71,29 @@ func TestUpdatePeersList(t *testing.T) {
 		{Address: "127.0.0.1", Port: "9003", Status: peers.ONLINE},
 	}
 
-	UpdatePeersMap(initialPeers, newPeers)
-
-	if len(initialPeers) != len(expectedPeers) {
-		t.Fatalf("Expected %d peers, got %d", len(expectedPeers), len(initialPeers))
-	}
+	PeersListResponse(message, initialPeers)
 
 	for _, peer := range expectedPeers {
 		_, exists := initialPeers[peer.FullAddress()]
 		if !exists || peer.Status != initialPeers[peer.FullAddress()] {
 			t.Fatalf("Expected peer %v, got %v", initialPeers[peer.FullAddress()], peer.Status)
 		}
+	}
+}
+
+func TestPeerListResponseArgumentsNil(t *testing.T) {
+	initialPeers := make(map[string]peers.PeerStatus)
+
+	message := message.BaseMessage{
+		Clock:     0,
+		Type:      message.PEERS_LIST,
+		Arguments: []string{"0"},
+	}
+
+	PeersListResponse(message, initialPeers)
+
+	if len(initialPeers) != 0 {
+		t.Fatalf("Expected 0 peers, got %d", len(initialPeers))
 	}
 }
 
