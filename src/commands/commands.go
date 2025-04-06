@@ -78,11 +78,12 @@ func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRe
 		if number == 0 {
 			exit = true
 		} else if number > 0 && number <= counter {
-			// Enviar mensagem HELLO
+			// Envia mensagem HELLO e atualiza o status do peer
 			peerStatus := requestClient.HelloRequest(addrList[number-1])
 			if knownPeers[addrList[number-1]] != peerStatus {
 				logger.Info("Atualizando peer " + addrList[number-1] + " status " + peerStatus.String())
 			}
+			knownPeers[addrList[number-1]] = peerStatus
 			exit = true
 		} else {
 			fmt.Println("Opção inválida")

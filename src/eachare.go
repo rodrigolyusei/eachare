@@ -169,7 +169,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 	// Se a CLI está esperando por uma entrada, imprime nova linha para formatação
 	if waiting_cli {
-		fmt.Println()
+		logger.Info("\n")
 	}
 
 	// Buffer para armazenar os dados recebidos da conexão
@@ -186,7 +186,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 	// Mensagem para o caso do peer não ser conhecido ou não estar online
 	if !exists {
 		logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
-	} else if status == peers.OFFLINE {
+	} else if status == peers.OFFLINE && receivedMessage.Type != message.BYE {
 		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 	}
 
@@ -205,7 +205,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 	// Verifica se a CLI está esperando por uma entrada
 	if waiting_cli {
-		fmt.Print("\n> ")
+		logger.Info("\n> ")
 	}
 }
 
