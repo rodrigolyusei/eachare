@@ -192,14 +192,12 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 	// Lida o comando recebido de acordo com o tipo de mensagem
 	switch receivedMessage.Type {
-	case message.HELLO:
 	case message.GET_PEERS:
-		commands.GetPeersResponse(conn, receivedMessage, knownPeers, requestClient)
+		commands.GetPeersResponse(receivedMessage, knownPeers, conn, requestClient)
 	case message.PEERS_LIST:
 		commands.PeersListResponse(receivedMessage, knownPeers)
 	case message.BYE:
-		knownPeers[receivedMessage.Origin] = peers.OFFLINE
-		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
+		commands.ByeResponse(receivedMessage, knownPeers)
 	}
 
 	// Verifica se a CLI está esperando por uma entrada
