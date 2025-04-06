@@ -19,6 +19,15 @@ const (
 	ERROR
 )
 
+// Estrutura para armazenar a mensagem de log e seu nível
+type LogMessage struct {
+	Level   LogLevel
+	Message string
+}
+
+// Fila para armazenar mensagens de log
+var logQueue = make(chan LogMessage, 100)
+
 // Variáveis para o buffer da mensagem e logger para escrita
 var infoBuf bytes.Buffer
 var infoLogger *log.Logger
@@ -31,13 +40,6 @@ var errorLogger *log.Logger
 
 var outputBuf io.Writer
 var logLevel = INFO
-
-type LogMessage struct {
-	Level   LogLevel
-	Message string
-}
-
-var logQueue = make(chan LogMessage, 100)
 
 // Setter para o logLevel
 func SetLogLevel(level LogLevel) {
@@ -60,24 +62,6 @@ func (l LogLevel) String() string {
 	}
 }
 
-// init() é chamado na execução automaticamente, e aqui define o padrão pro log
-func init() {
-	SetOutput(os.Stdout)
-
-	go ConsumeLogQueue(logQueue)
-
-	infoLogger = log.New(&infoBuf, "", 0)
-	debugLogger = log.New(&debugBuf, "[DEBUG] ", log.Lmicroseconds|log.Lmsgprefix)
-	errorLogger = log.New(&errorBuf, "[ERROR] ", log.Lmicroseconds|log.Lmsgprefix|log.Lshortfile)
-}
-
-func ConsumeLogQueue(ch chan LogMessage) {
-	for {
-		logMessage := <-ch
-		outputBuf.Write([]byte(logMessage.Message))
-	}
-}
-
 // Define a saída padrão para o logger
 func SetOutput(w io.Writer) {
 	if w == nil {
@@ -85,6 +69,24 @@ func SetOutput(w io.Writer) {
 	} else {
 		outputBuf = w
 	}
+}
+
+// Função para ler da fila de logs e escrever no buffer de saída
+func ConsumeLogQueue(ch chan LogMessage) {
+	for {
+		logMessage := <-ch
+		outputBuf.Write([]byte(logMessage.Message))
+	}
+}
+
+// init() é chamado na execução automaticamente, e aqui define o padrão pro log
+func init() {
+	SetOutput(os.Stdout)
+	go ConsumeLogQueue(logQueue)
+
+	infoLogger = log.New(&infoBuf, "", 0)
+	debugLogger = log.New(&debugBuf, "[DEBUG] ", log.Lmicroseconds|log.Lmsgprefix)
+	errorLogger = log.New(&errorBuf, "[ERROR] ", log.Lmicroseconds|log.Lmsgprefix|log.Lshortfile)
 }
 
 // Funções para logar mensagens de diferentes níveis

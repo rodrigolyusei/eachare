@@ -44,11 +44,17 @@ func (r RequestClient) sendMessage(connection net.Conn, message message.BaseMess
 
 // Função para mensagem HELLO, avisa o peer que estou online
 func (r RequestClient) HelloRequest(receiverAddress string) peers.PeerStatus {
+	// Cria uma mensagem HELLO
 	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.HELLO, Arguments: nil}
+
+	// Tenta conectar e se conectar, define o deadline de 2 segundos
 	conn, _ := net.Dial("tcp", receiverAddress)
 	if conn != nil {
 		defer conn.Close()
+		conn.SetDeadline(time.Now().Add(2 * time.Second))
 	}
+
+	// Envia a mensagem HELLO e retorna o status do peer
 	err := r.sendMessage(conn, baseMessage, receiverAddress)
 	if err != nil {
 		return peers.OFFLINE
@@ -122,11 +128,12 @@ func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus, exit *
 		// Tenta conectar e se conectar define o deadline de 2 segundos
 		conn, _ := net.Dial("tcp", addressPort)
 		if conn != nil {
-			conn.SetDeadline(time.Now().Add(2 * time.Second))
 			defer conn.Close()
+			conn.SetDeadline(time.Now().Add(2 * time.Second))
 		}
 		r.sendMessage(conn, baseMessage, addressPort)
 	}
 
-	*exit = true // Define a variável de saída como verdadeira
+	// Altera a saída como verdadeiro para finalizar o programa
+	*exit = true
 }

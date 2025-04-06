@@ -34,37 +34,16 @@ var knownPeers = make(map[string]peers.PeerStatus) // Hashmap com chave sendo o 
 var myargs SelfArgs                                // Armazena os parâmetros de si mesmo
 var waiting_cli = false                            // Variável para controlar o estado do CLI
 
-// Função principal do programa
-func main() {
-	// Verifica se o programa está sendo executado em modo de teste ou não
-	if len(os.Args) == 5 && os.Args[4] == "--test" {
-		myargs, err = testArgs(os.Args)
-		check(err)
-	} else {
-		// Pega os argumentos de entrada
-		myargs, err = getArgs(os.Args)
-		check(err)
-
-		// Adiciona os vizinhos conhecidos pelo arquivo de vizinhos
-		err = addNeighbors(myargs.Neighbors)
-		check(err)
-	}
-
-	requestClient := request.RequestClient{Address: myargs.FullAddress()}
-
-	// Verifica o diretório compartilhado
-	err = verifySharedDirectory(myargs.Shared)
-	check(err)
-
-	// Inicializa o peer
-	listener(myargs, requestClient)
-}
-
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// Método do SelfArgs para retornar o endereço completo (endereço:porta)
+func (args SelfArgs) FullAddress() string {
+	return args.Address + ":" + args.Port
 }
 
 // Função para modo de teste, simulando a execução do programa com argumentos específicos
@@ -136,11 +115,6 @@ func verifySharedDirectory(sharedPath string) error {
 	return err
 }
 
-// Método do SelfArgs para retornar o endereço completo (endereço + porta)
-func (args SelfArgs) FullAddress() string {
-	return args.Address + ":" + args.Port
-}
-
 // Função para iniciar o peer e escutar conexões
 func listener(args SelfArgs, requestClient request.RequestClient) {
 	// Cria um listener TCP no endereço e porta especificado
@@ -190,7 +164,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 		logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 	}
 
-	// Adiciona o peer como conhecido e status ONLINE
+	// Adiciona o peer nos conhecido com status ONLINE
 	knownPeers[receivedMessage.Origin] = peers.ONLINE
 
 	// Lida o comando recebido de acordo com o tipo de mensagem
@@ -265,4 +239,31 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 
 	// Encerra o programa
 	os.Exit(0)
+}
+
+// Função principal do programa
+func main() {
+	// Verifica se o programa está sendo executado em modo de teste ou não
+	if len(os.Args) == 5 && os.Args[4] == "--test" {
+		myargs, err = testArgs(os.Args)
+		check(err)
+	} else {
+		// Pega os argumentos de entrada
+		myargs, err = getArgs(os.Args)
+		check(err)
+
+		// Adiciona os vizinhos conhecidos pelo arquivo de vizinhos
+		err = addNeighbors(myargs.Neighbors)
+		check(err)
+	}
+
+	// Cria o cliente de requisições que será usado para enviar mensagens
+	requestClient := request.RequestClient{Address: myargs.FullAddress()}
+
+	// Verifica o diretório compartilhado
+	err = verifySharedDirectory(myargs.Shared)
+	check(err)
+
+	// Inicializa o peer
+	listener(myargs, requestClient)
 }

@@ -124,6 +124,7 @@ func PeersListResponse(receivedMessage message.BaseMessage, knownPeers map[strin
 	}
 }
 
+// Função para lidar com o BYE recebido
 func ByeResponse(receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
 	knownPeers[receivedMessage.Origin] = peers.OFFLINE
 	logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
