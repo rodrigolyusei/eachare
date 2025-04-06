@@ -16,7 +16,7 @@ import (
 // Interface para definir os métodos de requisição
 type IRequest interface {
 	GetPeersRequest(knownPeers map[string]peers.PeerStatus) []net.Conn
-	ByeRequest(knownPeers map[string]peers.PeerStatus) bool
+	ByeRequest(knownPeers map[string]peers.PeerStatus, exit *bool)
 	PeersListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus)
 	HelloRequest(receiverAddress string) peers.PeerStatus
 }
@@ -30,7 +30,7 @@ type RequestClient struct {
 func (r RequestClient) sendMessage(connection net.Conn, message message.BaseMessage, receiverAddress string) error {
 	// Atualiza o clock e mostra o encaminhamento
 	message.Clock = clock.UpdateClock()
-	logger.Info("Encaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
+	logger.Info("\tEncaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
 
 	// Se a conexão é nula retorna um erro
 	if connection == nil {
@@ -44,11 +44,17 @@ func (r RequestClient) sendMessage(connection net.Conn, message message.BaseMess
 
 // Função para mensagem HELLO, avisa o peer que estou online
 func (r RequestClient) HelloRequest(receiverAddress string) peers.PeerStatus {
+	// Cria uma mensagem HELLO
 	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.HELLO, Arguments: nil}
+
+	// Tenta conectar e se conectar, define o deadline de 2 segundos
 	conn, _ := net.Dial("tcp", receiverAddress)
 	if conn != nil {
 		defer conn.Close()
+		conn.SetDeadline(time.Now().Add(2 * time.Second))
 	}
+
+	// Envia a mensagem HELLO e retorna o status do peer
 	err := r.sendMessage(conn, baseMessage, receiverAddress)
 	if err != nil {
 		return peers.OFFLINE
@@ -76,13 +82,13 @@ func (r RequestClient) GetPeersRequest(knownPeers map[string]peers.PeerStatus) [
 		if err != nil {
 			// Se a conexão falhar e o peer estiver ONLINE, atualiza o status para OFFLINE
 			if knownPeers[address] == peers.ONLINE {
-				logger.Info("Atualizando peer " + address + " status " + peers.OFFLINE.String())
+				logger.Info("\tAtualizando peer " + address + " status " + peers.OFFLINE.String())
 				knownPeers[address] = peers.OFFLINE
 			}
 		} else {
 			// Se a conexão for bem-sucedida e o peer estiver OFFLINE, atualiza o status para ONLINE
 			if knownPeers[address] == peers.OFFLINE {
-				logger.Info("Atualizando peer " + address + " status " + peers.ONLINE.String())
+				logger.Info("\tAtualizando peer " + address + " status " + peers.ONLINE.String())
 				knownPeers[address] = peers.ONLINE
 			}
 		}
@@ -112,7 +118,7 @@ func (r RequestClient) PeersListRequest(conn net.Conn, receivedMessage message.B
 }
 
 // Função para mensagem BYE, avisando os peers sobre a saída
-func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) bool {
+func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus, exit *bool) {
 	// Imprime mensagem de saída e cria a mensagem BYE
 	logger.Info("Saindo...")
 	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.BYE, Arguments: nil}
@@ -122,11 +128,12 @@ func (r RequestClient) ByeRequest(knownPeers map[string]peers.PeerStatus) bool {
 		// Tenta conectar e se conectar define o deadline de 2 segundos
 		conn, _ := net.Dial("tcp", addressPort)
 		if conn != nil {
-			conn.SetDeadline(time.Now().Add(2 * time.Second))
 			defer conn.Close()
+			conn.SetDeadline(time.Now().Add(2 * time.Second))
 		}
 		r.sendMessage(conn, baseMessage, addressPort)
 	}
 
-	return true
+	// Altera a saída como verdadeiro para finalizar o programa
+	*exit = true
 }

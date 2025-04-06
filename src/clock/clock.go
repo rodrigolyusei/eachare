@@ -1,6 +1,6 @@
 package clock
 
-// Pacote nativo de go e pacote interno
+// Pacotes nativos de go e pacote interno
 import (
 	"strconv"
 	"sync"
@@ -23,8 +23,9 @@ func UpdateClock() int {
 	safeClock.Mutex.Lock()
 	defer safeClock.Mutex.Unlock()
 
+	// Incrementa o relógio e imprime a mensagem de atualização
 	safeClock.Clock++
-	logger.Info("=> Atualizando relogio para " + strconv.Itoa(safeClock.Clock))
+	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(safeClock.Clock))
 	return safeClock.Clock
 }
 

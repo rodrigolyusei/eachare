@@ -92,10 +92,11 @@ func TestByeRequest(t *testing.T) {
 	knowPeers["127.0.0.2:8081"] = peers.OFFLINE
 
 	var buffer bytes.Buffer
+	var exit bool = false
 
 	logger.SetOutput(&buffer)
 
-	requestClient.ByeRequest(knowPeers)
+	requestClient.ByeRequest(knowPeers, &exit)
 
 	out := buffer.String()
 	expected := `	Saindo...

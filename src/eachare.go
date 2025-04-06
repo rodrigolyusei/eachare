@@ -2,6 +2,7 @@ package main
 
 // Pacotes nativos de go e pacotes internos
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"log"
@@ -33,37 +34,16 @@ var knownPeers = make(map[string]peers.PeerStatus) // Hashmap com chave sendo o 
 var myargs SelfArgs                                // Armazena os parâmetros de si mesmo
 var waiting_cli = false                            // Variável para controlar o estado do CLI
 
-// Função principal do programa
-func main() {
-	// Verifica se o programa está sendo executado em modo de teste ou não
-	if len(os.Args) == 5 && os.Args[4] == "--test" {
-		myargs, err = testArgs(os.Args)
-		check(err)
-	} else {
-		// Pega os argumentos de entrada
-		myargs, err = getArgs(os.Args)
-		check(err)
-
-		// Adiciona os vizinhos conhecidos pelo arquivo de vizinhos
-		err = addNeighbors(myargs.Neighbors)
-		check(err)
-	}
-
-	requestClient := request.RequestClient{Address: myargs.FullAddress()}
-
-	// Verifica o diretório compartilhado
-	err = verifySharedDirectory(myargs.Shared)
-	check(err)
-
-	// Inicializa o peer
-	listener(myargs, requestClient)
-}
-
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// Método do SelfArgs para retornar o endereço completo (endereço:porta)
+func (args SelfArgs) FullAddress() string {
+	return args.Address + ":" + args.Port
 }
 
 // Função para modo de teste, simulando a execução do programa com argumentos específicos
@@ -113,16 +93,18 @@ func getArgs(args []string) (SelfArgs, error) {
 
 // Função para adicionar vizinhos conhecidos a partir de um arquivo
 func addNeighbors(neighborsPath string) error {
-	// Lê o arquivo de vizinhos
-	neighborsFile, err := os.ReadFile(neighborsPath)
+	// Abre o arquivo de vizinhos
+	file, err := os.Open(neighborsPath)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
-	// Separa os vizinhos por linhas
-	neighbors := strings.SplitSeq(string(neighborsFile), "\n")
-	for neighbor := range neighbors {
-		knownPeers[neighbor] = peers.OFFLINE
+	// Lê o arquivo linha por linha
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		knownPeers[scanner.Text()] = peers.OFFLINE
+		logger.Info("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String())
 	}
 	return nil
 }
@@ -131,11 +113,6 @@ func addNeighbors(neighborsPath string) error {
 func verifySharedDirectory(sharedPath string) error {
 	_, err := os.ReadDir(sharedPath)
 	return err
-}
-
-// Método do SelfArgs para retornar o endereço completo (endereço + porta)
-func (args SelfArgs) FullAddress() string {
-	return args.Address + ":" + args.Port
 }
 
 // Função para iniciar o peer e escutar conexões
@@ -164,62 +141,56 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 	// defer(adia) a função de fechamento da conexão quando as operações terminarem
 	defer conn.Close()
 
-	for {
-		// Se a CLI está esperando por uma entrada, imprime nova linha para formatação
-		if waiting_cli {
-			fmt.Println()
-		}
+	// Se a CLI está esperando por uma entrada, imprime nova linha para formatação
+	if waiting_cli {
+		logger.Std("\n\n")
+	}
 
-		// Buffer para armazenar os dados recebidos da conexão
-		buf := make([]byte, 1024)
-		_, err := conn.Read(buf)
-		if err != nil {
-			break
-		}
+	// Buffer para armazenar os dados recebidos da conexão
+	buf := make([]byte, 1024)
+	_, err := conn.Read(buf)
+	check(err)
 
-		// Decodifica os dados recebidos em string
-		receivedMessage := commands.ReceiveMessage(string(buf))
+	// Decodifica os dados recebidos em string
+	receivedMessage := commands.ReceiveMessage(string(buf))
 
-		// Verifica se a mensagem recebida é de um peer conhecido
-		status, exists := knownPeers[receivedMessage.Origin]
+	// Verifica se a mensagem recebida é de um peer conhecido
+	status, exists := knownPeers[receivedMessage.Origin]
 
-		// Mensagem para o caso do peer não ser conhecido ou não estar online
-		if !exists {
-			logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status ONLINE")
-		} else if status == peers.OFFLINE {
-			logger.Info("Atualizando peer " + receivedMessage.Origin + " status ONLINE")
-		}
+	// Mensagem para o caso do peer não ser conhecido ou não estar online
+	if !exists {
+		logger.Info("\tAdicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+	} else if status == peers.OFFLINE && receivedMessage.Type != message.BYE {
+		logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+	}
 
-		// Adiciona o peer como conhecido e status ONLINE
-		knownPeers[receivedMessage.Origin] = peers.ONLINE
+	// Adiciona o peer nos conhecido com status ONLINE
+	knownPeers[receivedMessage.Origin] = peers.ONLINE
 
-		// Lida o comando recebido de acordo com o tipo de mensagem
-		switch receivedMessage.Type {
-		case message.HELLO:
-		case message.GET_PEERS:
-			commands.GetPeersResponse(conn, receivedMessage, knownPeers, requestClient)
-		case message.PEERS_LIST:
-			newPeers := commands.PeersListResponse(receivedMessage)
-			commands.UpdatePeersMap(knownPeers, newPeers)
-		case message.BYE:
-			knownPeers[receivedMessage.Origin] = peers.OFFLINE
-			fmt.Println("\tAtualizando peer", receivedMessage.Origin, "status", peers.OFFLINE)
-		}
+	// Lida o comando recebido de acordo com o tipo de mensagem
+	switch receivedMessage.Type {
+	case message.GET_PEERS:
+		commands.GetPeersResponse(receivedMessage, knownPeers, conn, requestClient)
+	case message.PEERS_LIST:
+		commands.PeersListResponse(receivedMessage, knownPeers)
+	case message.BYE:
+		commands.ByeResponse(receivedMessage, knownPeers)
+	}
 
-		// Verifica se a CLI está esperando por uma entrada
-		if waiting_cli {
-			fmt.Print("\n> ")
-		}
+	// Verifica se a CLI está esperando por uma entrada
+	if waiting_cli {
+		logger.Std("\n> ")
 	}
 }
 
 // Função para a CLI/menu de interação com o usuário
 func cliInterface(args SelfArgs, requestClient request.RequestClient) {
-	// Variável para armazenar o comando digitado
+	// Variável para o comando digitado e a saída
 	var comm string
+	var exit bool = false
 
 	// Loop para manter a CLI ativa
-	for {
+	for !exit {
 		// Indica que a CLI está esperando por uma entrada
 		waiting_cli = true
 
@@ -256,10 +227,7 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			canLeave := requestClient.ByeRequest(knownPeers)
-			if canLeave {
-				os.Exit(0)
-			}
+			requestClient.ByeRequest(knownPeers, &exit)
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
 		}
@@ -268,4 +236,34 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 		waiting_cli = false
 		time.Sleep(500 * time.Millisecond)
 	}
+
+	// Encerra o programa
+	os.Exit(0)
+}
+
+// Função principal do programa
+func main() {
+	// Verifica se o programa está sendo executado em modo de teste ou não
+	if len(os.Args) == 5 && os.Args[4] == "--test" {
+		myargs, err = testArgs(os.Args)
+		check(err)
+	} else {
+		// Pega os argumentos de entrada
+		myargs, err = getArgs(os.Args)
+		check(err)
+
+		// Adiciona os vizinhos conhecidos pelo arquivo de vizinhos
+		err = addNeighbors(myargs.Neighbors)
+		check(err)
+	}
+
+	// Cria o cliente de requisições que será usado para enviar mensagens
+	requestClient := request.RequestClient{Address: myargs.FullAddress()}
+
+	// Verifica o diretório compartilhado
+	err = verifySharedDirectory(myargs.Shared)
+	check(err)
+
+	// Inicializa o peer
+	listener(myargs, requestClient)
 }
