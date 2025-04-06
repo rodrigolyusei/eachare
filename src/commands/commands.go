@@ -55,21 +55,23 @@ func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRe
 
 	// Listar todos os peers conhecidos enquanto conta e armazena os endereços
 	var addrList []string
-	counter := 0
+	var counter int = 0
 	for addressPort, peerStatus := range knownPeers {
 		counter++
 		addrList = append(addrList, addressPort)
 		fmt.Println("\t[" + strconv.Itoa(counter) + "] " + addressPort + " " + peerStatus.String())
 	}
 
-	var input string
-	exit := false
+	var comm string
+	var exit bool = false
 	for !exit {
 		// Lê a entrada do usuário
 		fmt.Print("> ")
-		fmt.Scanln(&input)
+		fmt.Scanln(&comm)
 		fmt.Println()
-		number, err := strconv.Atoi(input)
+
+		// Converte a entrada para inteiro
+		number, err := strconv.Atoi(comm)
 		check(err)
 
 		// Envio de mensagem para o destino escolhido

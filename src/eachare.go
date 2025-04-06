@@ -2,6 +2,7 @@ package main
 
 // Pacotes nativos de go e pacotes internos
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"log"
@@ -113,16 +114,18 @@ func getArgs(args []string) (SelfArgs, error) {
 
 // Função para adicionar vizinhos conhecidos a partir de um arquivo
 func addNeighbors(neighborsPath string) error {
-	// Lê o arquivo de vizinhos
-	neighborsFile, err := os.ReadFile(neighborsPath)
+	// Abre o arquivo de vizinhos
+	file, err := os.Open(neighborsPath)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
-	// Separa os vizinhos por linhas
-	neighbors := strings.SplitSeq(string(neighborsFile), "\n")
-	for neighbor := range neighbors {
-		knownPeers[neighbor] = peers.OFFLINE
+	// Lê o arquivo linha por linha
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		knownPeers[scanner.Text()] = peers.OFFLINE
+		fmt.Println("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String())
 	}
 	return nil
 }
