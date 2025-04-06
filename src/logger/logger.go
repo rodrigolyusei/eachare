@@ -90,6 +90,13 @@ func init() {
 }
 
 // Funções para logar mensagens de diferentes níveis
+func Std(str string) {
+	if logLevel >= ZERO {
+		logQueue <- LogMessage{Level: INFO, Message: str}
+		infoBuf.Reset()
+	}
+}
+
 func Info(str string) {
 	infoLogger.Output(2, str)
 	if logLevel >= INFO {

@@ -143,7 +143,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 	// Se a CLI está esperando por uma entrada, imprime nova linha para formatação
 	if waiting_cli {
-		logger.Info("\n")
+		logger.Std("\n\n")
 	}
 
 	// Buffer para armazenar os dados recebidos da conexão
@@ -179,7 +179,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 
 	// Verifica se a CLI está esperando por uma entrada
 	if waiting_cli {
-		logger.Info("\n> ")
+		logger.Std("\n> ")
 	}
 }
 
