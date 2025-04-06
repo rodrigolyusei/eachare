@@ -48,39 +48,6 @@ func ReceiveMessage(receivedMessage string) message.BaseMessage {
 	}
 }
 
-// Função para responder ao get peers recebido
-func GetPeersResponse(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus, requestClient request.IRequest) {
-	requestClient.PeersListRequest(conn, receivedMessage, knownPeers)
-}
-
-// Função para responder ao peers list recebido
-func PeersListResponse(baseMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
-	// Conta quantos peers foram recebidos na mensagem
-	peersCount, err := strconv.Atoi(baseMessage.Arguments[0])
-	check(err)
-
-	// Para cada peer na mensagem adiciona nos peers conhecidos
-	for i := range peersCount {
-		peerInfos := strings.Split(baseMessage.Arguments[1+i], ":")
-		newPeer := peers.Peer{Address: peerInfos[0], Port: peerInfos[1], Status: peers.GetStatus(peerInfos[2])}
-		_, exists := knownPeers[newPeer.FullAddress()]
-		if !exists {
-			logger.Info("Adicionando novo peer " + newPeer.FullAddress() + " status " + newPeer.Status.String())
-			knownPeers[newPeer.FullAddress()] = newPeer.Status
-		}
-	}
-}
-
-// Função para listar os arquivos do diretório compartilhado
-func ListLocalFiles(sharedPath string) {
-	// Lê o diretório e imprime os arquivos
-	entries, err := os.ReadDir(sharedPath)
-	check(err)
-	for _, entry := range entries {
-		fmt.Println("\t" + entry.Name())
-	}
-}
-
 // Função para listar os peers conhecidos e enviar HELLO para o peer escolhido
 func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRequest) {
 	fmt.Println("Lista de peers: ")
@@ -117,6 +84,39 @@ func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRe
 			exit = true
 		} else {
 			fmt.Println("Opção inválida")
+		}
+	}
+}
+
+// Função para listar os arquivos do diretório compartilhado
+func ListLocalFiles(sharedPath string) {
+	// Lê o diretório e imprime os arquivos
+	entries, err := os.ReadDir(sharedPath)
+	check(err)
+	for _, entry := range entries {
+		fmt.Println("\t" + entry.Name())
+	}
+}
+
+// Função para responder ao get peers recebido
+func GetPeersResponse(conn net.Conn, receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus, requestClient request.IRequest) {
+	requestClient.PeersListRequest(conn, receivedMessage, knownPeers)
+}
+
+// Função para responder ao peers list recebido
+func PeersListResponse(baseMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
+	// Conta quantos peers foram recebidos na mensagem
+	peersCount, err := strconv.Atoi(baseMessage.Arguments[0])
+	check(err)
+
+	// Para cada peer na mensagem adiciona nos peers conhecidos
+	for i := range peersCount {
+		peerInfos := strings.Split(baseMessage.Arguments[1+i], ":")
+		newPeer := peers.Peer{Address: peerInfos[0], Port: peerInfos[1], Status: peers.GetStatus(peerInfos[2])}
+		_, exists := knownPeers[newPeer.FullAddress()]
+		if !exists {
+			logger.Info("Adicionando novo peer " + newPeer.FullAddress() + " status " + newPeer.Status.String())
+			knownPeers[newPeer.FullAddress()] = newPeer.Status
 		}
 	}
 }

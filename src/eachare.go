@@ -164,51 +164,47 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 	// defer(adia) a função de fechamento da conexão quando as operações terminarem
 	defer conn.Close()
 
-	for {
-		// Se a CLI está esperando por uma entrada, imprime nova linha para formatação
-		if waiting_cli {
-			fmt.Println()
-		}
+	// Se a CLI está esperando por uma entrada, imprime nova linha para formatação
+	if waiting_cli {
+		fmt.Println()
+	}
 
-		// Buffer para armazenar os dados recebidos da conexão
-		buf := make([]byte, 1024)
-		_, err := conn.Read(buf)
-		if err != nil {
-			break
-		}
+	// Buffer para armazenar os dados recebidos da conexão
+	buf := make([]byte, 1024)
+	_, err := conn.Read(buf)
+	check(err)
 
-		// Decodifica os dados recebidos em string
-		receivedMessage := commands.ReceiveMessage(string(buf))
+	// Decodifica os dados recebidos em string
+	receivedMessage := commands.ReceiveMessage(string(buf))
 
-		// Verifica se a mensagem recebida é de um peer conhecido
-		status, exists := knownPeers[receivedMessage.Origin]
+	// Verifica se a mensagem recebida é de um peer conhecido
+	status, exists := knownPeers[receivedMessage.Origin]
 
-		// Mensagem para o caso do peer não ser conhecido ou não estar online
-		if !exists {
-			logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
-		} else if status == peers.OFFLINE {
-			logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
-		}
+	// Mensagem para o caso do peer não ser conhecido ou não estar online
+	if !exists {
+		logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+	} else if status == peers.OFFLINE {
+		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+	}
 
-		// Adiciona o peer como conhecido e status ONLINE
-		knownPeers[receivedMessage.Origin] = peers.ONLINE
+	// Adiciona o peer como conhecido e status ONLINE
+	knownPeers[receivedMessage.Origin] = peers.ONLINE
 
-		// Lida o comando recebido de acordo com o tipo de mensagem
-		switch receivedMessage.Type {
-		case message.HELLO:
-		case message.GET_PEERS:
-			commands.GetPeersResponse(conn, receivedMessage, knownPeers, requestClient)
-		case message.PEERS_LIST:
-			commands.PeersListResponse(receivedMessage, knownPeers)
-		case message.BYE:
-			knownPeers[receivedMessage.Origin] = peers.OFFLINE
-			logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
-		}
+	// Lida o comando recebido de acordo com o tipo de mensagem
+	switch receivedMessage.Type {
+	case message.HELLO:
+	case message.GET_PEERS:
+		commands.GetPeersResponse(conn, receivedMessage, knownPeers, requestClient)
+	case message.PEERS_LIST:
+		commands.PeersListResponse(receivedMessage, knownPeers)
+	case message.BYE:
+		knownPeers[receivedMessage.Origin] = peers.OFFLINE
+		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
+	}
 
-		// Verifica se a CLI está esperando por uma entrada
-		if waiting_cli {
-			fmt.Print("\n> ")
-		}
+	// Verifica se a CLI está esperando por uma entrada
+	if waiting_cli {
+		fmt.Print("\n> ")
 	}
 }
 
