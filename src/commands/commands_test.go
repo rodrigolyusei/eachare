@@ -1,130 +1,99 @@
 package commands
 
-// import (
-// 	"EACHare/src/commands/message"
-// 	"EACHare/src/peers"
-// 	"os"
-// 	"testing"
-// )
+import (
+	"bytes"
+	"os"
+	"strings"
+	"sync"
+	"testing"
 
-// // https://gobyexample.com/writing-files
-// func setupTestDir(path string, files []string) {
-// 	os.Mkdir(path, 0755)
-// 	for _, file := range files {
-// 		os.WriteFile(path+"/"+file, []byte("test content"), 0644)
-// 	}
-// }
+	"EACHare/src/commands/message"
+	"EACHare/src/peers"
+)
 
-// func teardownTestDir(path string) {
-// 	os.RemoveAll(path)
-// }
+// https://gobyexample.com/writing-files
+func setupTestDir(path string, files []string) {
+	os.Mkdir(path, 0755)
+	for _, file := range files {
+		os.WriteFile(path+"/"+file, []byte("test content"), 0644)
+	}
+}
 
-// // func TestGetSharedDirectory(t *testing.T) {
-// // 	sharedPath := "../shared"
-// // 	setupTestDir(sharedPath, []string{"loren.txt", "ipsum.txt"})
-// // 	// this scheadules the teardown function to run after the test finishes
-// // 	defer teardownTestDir(sharedPath)
+func teardownTestDir(path string) {
+	os.RemoveAll(path)
+}
 
-// // 	entries := GetSharedDirectory(sharedPath)
-// // 	if len(entries) != 2 {
-// // 		t.Errorf("Expected two entries, got %d", len(entries))
-// // 	}
-// // 	if entries[0].Name() != "ipsum.txt" {
-// // 		t.Errorf("Expected first entry to be 'loren.txt', got %s", entries[0].Name())
-// // 	}
-// // }
+func TestGetSharedDirectory(t *testing.T) {
+	sharedPath := "../shared"
+	setupTestDir(sharedPath, []string{"loren.txt", "ipsum.txt"})
+	defer teardownTestDir(sharedPath)
 
-// // func TestSendMessageWithArguments(t *testing.T) {
-// // 	clock.ResetClock()
-// // 	conn := &mockConn{}
-// // 	message := BaseMessage{
-// // 		Clock:     0,
-// // 		Type:      UNKNOWN,
-// // 		Arguments: []string{"arg1", "arg2"},
-// // 	}
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
 
-// // 	err := sendMessage(conn, message, "")
-// // 	if err != nil {
-// // 		t.Fatalf("Expected no error, got %v", err)
-// // 	}
+	ListLocalFiles(sharedPath)
 
-// // 	expected := "localhost 1 UNKNOWN arg1 arg2"
-// // 	if string(conn.data) != expected {
-// // 		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
-// // 	}
-// // }
+	w.Close()
+	os.Stdout = oldStdout
+	var buffer bytes.Buffer
+	buffer.ReadFrom(r)
+	out := buffer.String()
 
-// func TestPeerListReceive(t *testing.T) {
-// 	initialPeers := make(map[string]peers.PeerStatus)
-// 	initialPeers["127.0.0.1:9001"] = peers.ONLINE
-// 	initialPeers["127.0.0.1:9002"] = peers.OFFLINE
+	expected := `	ipsum.txt
+	loren.txt
+	`
+	if strings.TrimSpace(expected) != strings.TrimSpace(out) {
+		t.Errorf("Expected %d \n%s, got %d \n%s", len(expected), expected, len(out), out)
 
-// 	message := message.BaseMessage{
-// 		Clock:     0,
-// 		Type:      message.PEERS_LIST,
-// 		Arguments: []string{"2", "127.0.0.1:9002:ONLINE:3", "127.0.0.1:9003:ONLINE:0"},
-// 	}
+	}
+}
 
-// 	expectedPeers := []peers.Peer{
-// 		{Address: "127.0.0.1", Port: "9001", Status: peers.ONLINE},
-// 		{Address: "127.0.0.1", Port: "9002", Status: peers.OFFLINE},
-// 		{Address: "127.0.0.1", Port: "9003", Status: peers.ONLINE},
-// 	}
+func TestPeerListReceive(t *testing.T) {
+	var initialPeers sync.Map
+	initialPeers.Store("127.0.0.1:9001", peers.ONLINE)
+	initialPeers.Store("127.0.0.1:9002", peers.OFFLINE)
 
-// 	PeersListResponse(message, initialPeers)
+	message := message.BaseMessage{
+		Clock:     0,
+		Type:      message.PEERS_LIST,
+		Arguments: []string{"2", "127.0.0.1:9002:ONLINE:3", "127.0.0.1:9003:ONLINE:0"},
+	}
 
-// 	for _, peer := range expectedPeers {
-// 		_, exists := initialPeers[peer.FullAddress()]
-// 		if !exists || peer.Status != initialPeers[peer.FullAddress()] {
-// 			t.Fatalf("Expected peer %v, got %v", initialPeers[peer.FullAddress()], peer.Status)
-// 		}
-// 	}
-// }
+	expectedPeers := []peers.Peer{
+		{Address: "127.0.0.1", Port: "9001", Status: peers.ONLINE},
+		{Address: "127.0.0.1", Port: "9002", Status: peers.OFFLINE},
+		{Address: "127.0.0.1", Port: "9003", Status: peers.ONLINE},
+	}
 
-// func TestPeerListResponseArgumentsNil(t *testing.T) {
-// 	initialPeers := make(map[string]peers.PeerStatus)
+	PeersListResponse(message, &initialPeers)
 
-// 	message := message.BaseMessage{
-// 		Clock:     0,
-// 		Type:      message.PEERS_LIST,
-// 		Arguments: []string{"0"},
-// 	}
+	for _, peer := range expectedPeers {
+		status, exists := initialPeers.Load(peer.FullAddress())
+		if !exists || peer.Status != status {
+			t.Fatalf("Expected peer %v, got %v", status, peer.Status)
+		}
+	}
+}
 
-// 	PeersListResponse(message, initialPeers)
+func TestPeerListResponseArgumentsNil(t *testing.T) {
+	var initialPeers sync.Map
 
-// 	if len(initialPeers) != 0 {
-// 		t.Fatalf("Expected 0 peers, got %d", len(initialPeers))
-// 	}
-// }
+	message := message.BaseMessage{
+		Clock:     0,
+		Type:      message.PEERS_LIST,
+		Arguments: []string{"0"},
+	}
 
-// // func TestGetPeersResponse(t *testing.T) {
-// // 	clock.ResetClock()
-// // 	conn := &mockConn{}
+	PeersListResponse(message, &initialPeers)
 
-// // 	// Mock received message
-// // 	receivedMessage := BaseMessage{
-// // 		Origin:    "127.0.0.2:9001",
-// // 		Clock:     1,
-// // 		Type:      GET_PEERS,
-// // 		Arguments: []string{},
-// // 	}
+	peersCount := 0
+	initialPeers.Range(func(_, _ interface{}) bool {
+		peersCount++
+		return true
+	})
 
-// // 	// Mock known peers
-// // 	knowPeers := make(map[string]peers.PeerStatus)
-// // 	knowPeers["127.0.0.1:8080"] = peers.ONLINE
-// // 	knowPeers["127.0.0.2:8081"] = peers.OFFLINE
-
-// // 	expected := "localhost 1 PEERS_LIST 2 127.0.0.1:8080:ONLINE:0 127.0.0.2:8081:OFFLINE:0"
-
-// // 	// Call the function
-// // 	GetPeersResponse(conn, receivedMessage, knowPeers)
-
-// // 	if clock.GetClock() != 1 {
-// // 		t.Fatalf("Expected clock to be 1, got %d", clock.GetClock())
-// // 	}
-
-// // 	if string(conn.data) != expected {
-// // 		t.Fatalf("Expected %s, got %s", expected, conn.data)
-// // 	}
-
-// // }
+	if peersCount != 0 {
+		t.Fatalf("Expected 0 peers, got %d", peersCount)
+	}
+}

@@ -66,7 +66,6 @@ func (r RequestClient) HelloRequest(receiverAddress string) peers.PeerStatus {
 // Função para mensagem GET_PEERS, solicita para os vizinhos sobre quem eles conhecem
 func (r RequestClient) GetPeersRequest(knownPeers *sync.Map) []net.Conn {
 	// Cria um slice de conexões e a estrutura da mensagem GET_PEERS
-	// Calculate the length of knownPeers
 	peerCount := 0
 	knownPeers.Range(func(_, _ interface{}) bool {
 		peerCount++
