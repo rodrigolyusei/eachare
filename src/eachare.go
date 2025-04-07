@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"EACHare/src/commands"
@@ -29,10 +30,10 @@ type SelfArgs struct {
 }
 
 // Variáveis globais
-var err error                                      // Armazena o erro
-var knownPeers = make(map[string]peers.PeerStatus) // Hashmap com chave sendo o endereço do peer e valor sendo o status (online/offline)
-var myargs SelfArgs                                // Armazena os parâmetros de si mesmo
-var waiting_cli = false                            // Variável para controlar o estado do CLI
+var err error           // Armazena o erro
+var knownPeers sync.Map // Hashmap syncronizado para os peers conhecidos
+var myargs SelfArgs     // Armazena os parâmetros de si mesmo
+var waiting_cli = false // Variável para controlar o estado do CLI
 
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
@@ -54,11 +55,11 @@ func testArgs(args []string) (SelfArgs, error) {
 
 	// Cria um mapa de peers dinamicamente
 	if port%2 == 0 {
-		knownPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
-		knownPeers["127.0.0.1:"+strconv.Itoa(port+2)] = peers.OFFLINE
+		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+1), peers.ONLINE)
+		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+2), peers.OFFLINE)
 	} else {
-		knownPeers["127.0.0.1:"+strconv.Itoa(port+1)] = peers.ONLINE
-		knownPeers["127.0.0.1:"+strconv.Itoa(port+3)] = peers.OFFLINE
+		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+1), peers.ONLINE)
+		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+3), peers.OFFLINE)
 	}
 
 	// Cria o SelfArgs com os argumentos de teste
@@ -103,7 +104,7 @@ func addNeighbors(neighborsPath string) error {
 	// Lê o arquivo linha por linha
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		knownPeers[scanner.Text()] = peers.OFFLINE
+		knownPeers.Store(scanner.Text(), peers.OFFLINE)
 		logger.Info("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String())
 	}
 	return nil
@@ -155,7 +156,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 	receivedMessage := commands.ReceiveMessage(string(buf))
 
 	// Verifica se a mensagem recebida é de um peer conhecido
-	status, exists := knownPeers[receivedMessage.Origin]
+	status, exists := knownPeers.Load(receivedMessage.Origin)
 
 	// Mensagem para o caso do peer não ser conhecido ou não estar online
 	if !exists {
@@ -165,16 +166,16 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 	}
 
 	// Adiciona o peer nos conhecido com status ONLINE
-	knownPeers[receivedMessage.Origin] = peers.ONLINE
+	knownPeers.Store(receivedMessage.Origin, peers.ONLINE)
 
 	// Lida o comando recebido de acordo com o tipo de mensagem
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
-		commands.GetPeersResponse(receivedMessage, knownPeers, conn, requestClient)
+		commands.GetPeersResponse(receivedMessage, &knownPeers, conn, requestClient)
 	case message.PEERS_LIST:
-		commands.PeersListResponse(receivedMessage, knownPeers)
+		commands.PeersListResponse(receivedMessage, &knownPeers)
 	case message.BYE:
-		commands.ByeResponse(receivedMessage, knownPeers)
+		commands.ByeResponse(receivedMessage, &knownPeers)
 	}
 
 	// Verifica se a CLI está esperando por uma entrada
@@ -212,9 +213,9 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 		// Executa o comando correspondente
 		switch comm {
 		case "1":
-			commands.ListPeers(knownPeers, requestClient)
+			commands.ListPeers(&knownPeers, requestClient)
 		case "2":
-			connections := requestClient.GetPeersRequest(knownPeers)
+			connections := requestClient.GetPeersRequest(&knownPeers)
 			for _, conn := range connections {
 				go receiver(conn, requestClient)
 			}
@@ -227,7 +228,7 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			requestClient.ByeRequest(knownPeers, &exit)
+			requestClient.ByeRequest(&knownPeers, &exit)
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
 		}

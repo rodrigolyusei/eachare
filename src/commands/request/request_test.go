@@ -7,6 +7,7 @@ import (
 	"EACHare/src/peers"
 	"bytes"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -69,41 +70,44 @@ func TestSendMessageWriteError(t *testing.T) {
 }
 
 func TestGetPeersRequest(t *testing.T) {
-	knowPeers := make(map[string]peers.PeerStatus)
-	knowPeers["127.0.0.1:8080"] = peers.ONLINE
-	knowPeers["127.0.0.2:8081"] = peers.OFFLINE
+	var knownPeers sync.Map
+	knownPeers.Store("127.0.0.1:9001", peers.ONLINE)
+	knownPeers.Store("127.0.0.2:9002", peers.OFFLINE)
 
-	conns := requestClient.GetPeersRequest(knowPeers)
+	conns := requestClient.GetPeersRequest(&knownPeers)
 
 	if len(conns) != 0 {
 		t.Fatalf("Expected no connections, got %d", len(conns))
 	}
 
-	for _, peerStatus := range knowPeers {
+	knownPeers.Range(func(key, value interface{}) bool {
+		peerStatus := value.(peers.PeerStatus)
 		if peerStatus {
 			t.Errorf("Expected peer status to be false, got true")
 		}
-	}
+
+		return true
+	})
 }
 
 func TestByeRequest(t *testing.T) {
-	knowPeers := make(map[string]peers.PeerStatus)
-	knowPeers["127.0.0.1:8080"] = peers.ONLINE
-	knowPeers["127.0.0.2:8081"] = peers.OFFLINE
+	var knownPeers sync.Map
+	knownPeers.Store("127.0.0.1:9001", peers.ONLINE)
+	knownPeers.Store("127.0.0.2:9002", peers.OFFLINE)
 
 	var buffer bytes.Buffer
 	var exit bool = false
 
 	logger.SetOutput(&buffer)
 
-	requestClient.ByeRequest(knowPeers, &exit)
+	requestClient.ByeRequest(&knownPeers, &exit)
 
 	out := buffer.String()
-	expected := `	Saindo...
+	expected := `Saindo...
 	=> Atualizando relogio para 1
-	Encaminhando mensagem "localhost 1 BYE" para 127.0.0.1:8080
+	Encaminhando mensagem "localhost 1 BYE" para 127.0.0.1:9001
 	=> Atualizando relogio para 2
-	Encaminhando mensagem "localhost 2 BYE" para 127.0.0.2:8081
+	Encaminhando mensagem "localhost 2 BYE" para 127.0.0.2:9002
 	`
 	if strings.TrimSpace(expected) != strings.TrimSpace(out) {
 		t.Errorf("Expected %d \n%s, got %d \n%s", len(expected), expected, len(out), out)
@@ -112,10 +116,8 @@ func TestByeRequest(t *testing.T) {
 }
 
 func TestPeerListRequest(t *testing.T) {
-	knownPeers := map[string]peers.PeerStatus{
-		"127.0.0.1:9001": peers.ONLINE,
-		"127.0.0.2:9002": peers.OFFLINE,
-	}
+	var knownPeers sync.Map
+	knownPeers.Store("127.0.0.2:9002", peers.OFFLINE)
 
 	receivedMessage := message.BaseMessage{
 		Origin:    "127.0.0.1:9001",
@@ -125,7 +127,7 @@ func TestPeerListRequest(t *testing.T) {
 	}
 	mockConn := &mockConn{}
 
-	requestClient.PeersListRequest(mockConn, receivedMessage, knownPeers)
+	requestClient.PeersListRequest(mockConn, receivedMessage, &knownPeers)
 
 	output := string(mockConn.data)
 	expected := `localhost 1 PEERS_LIST 1 127.0.0.2:9002:OFFLINE:0`

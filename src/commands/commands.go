@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"EACHare/src/clock"
 	"EACHare/src/commands/message"
@@ -49,18 +50,22 @@ func ReceiveMessage(receivedMessage string) message.BaseMessage {
 }
 
 // Função para listar os peers conhecidos e enviar HELLO para o peer escolhido
-func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRequest) {
+func ListPeers(knownPeers *sync.Map, requestClient request.IRequest) {
 	fmt.Println("Lista de peers: ")
 	fmt.Println("\t[0] voltar para o menu anterior")
 
 	// Listar todos os peers conhecidos enquanto conta e armazena os endereços
 	var addrList []string
 	var counter int = 0
-	for addressPort, peerStatus := range knownPeers {
+	knownPeers.Range(func(key, value interface{}) bool {
+		addressPort := key.(string)
+		peerStatus := value.(peers.PeerStatus)
+
 		counter++
 		addrList = append(addrList, addressPort)
 		fmt.Println("\t[" + strconv.Itoa(counter) + "] " + addressPort + " " + peerStatus.String())
-	}
+		return true
+	})
 
 	var comm string
 	var exit bool = false
@@ -80,10 +85,10 @@ func ListPeers(knownPeers map[string]peers.PeerStatus, requestClient request.IRe
 		} else if number > 0 && number <= counter {
 			// Envia mensagem HELLO e atualiza o status do peer
 			peerStatus := requestClient.HelloRequest(addrList[number-1])
-			if knownPeers[addrList[number-1]] != peerStatus {
+			if value, _ := knownPeers.Load(addrList[number-1]); value != peerStatus {
 				logger.Info("\tAtualizando peer " + addrList[number-1] + " status " + peerStatus.String())
 			}
-			knownPeers[addrList[number-1]] = peerStatus
+			knownPeers.Store(addrList[number-1], peerStatus)
 			exit = true
 		} else {
 			fmt.Println("Opção inválida")
@@ -102,12 +107,12 @@ func ListLocalFiles(sharedPath string) {
 }
 
 // Função para responder ao get peers recebido
-func GetPeersResponse(receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus, conn net.Conn, requestClient request.IRequest) {
+func GetPeersResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map, conn net.Conn, requestClient request.IRequest) {
 	requestClient.PeersListRequest(conn, receivedMessage, knownPeers)
 }
 
 // Função para responder ao peers list recebido
-func PeersListResponse(receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
+func PeersListResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map) {
 	// Conta quantos peers foram recebidos na mensagem
 	peersCount, err := strconv.Atoi(receivedMessage.Arguments[0])
 	check(err)
@@ -116,16 +121,16 @@ func PeersListResponse(receivedMessage message.BaseMessage, knownPeers map[strin
 	for i := range peersCount {
 		peerInfos := strings.Split(receivedMessage.Arguments[1+i], ":")
 		newPeer := peers.Peer{Address: peerInfos[0], Port: peerInfos[1], Status: peers.GetStatus(peerInfos[2])}
-		_, exists := knownPeers[newPeer.FullAddress()]
+		_, exists := knownPeers.Load(newPeer.FullAddress())
 		if !exists {
 			logger.Info("\tAdicionando novo peer " + newPeer.FullAddress() + " status " + newPeer.Status.String())
-			knownPeers[newPeer.FullAddress()] = newPeer.Status
+			knownPeers.Store(newPeer.FullAddress(), newPeer.Status)
 		}
 	}
 }
 
 // Função para lidar com o BYE recebido
-func ByeResponse(receivedMessage message.BaseMessage, knownPeers map[string]peers.PeerStatus) {
-	knownPeers[receivedMessage.Origin] = peers.OFFLINE
+func ByeResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map) {
+	knownPeers.Store(receivedMessage.Origin, peers.OFFLINE)
 	logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
 }
