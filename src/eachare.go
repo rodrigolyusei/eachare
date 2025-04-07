@@ -123,9 +123,6 @@ func listener(args SelfArgs, requestClient request.RequestClient) {
 	check(err)
 	defer listener.Close()
 
-	// Cria uma goroutine/thread para a CLI
-	go cliInterface(args, requestClient)
-
 	// Loop para receber mensagens de outros peers
 	for {
 		// Accept trava o programa até receber uma conexão
@@ -264,6 +261,9 @@ func main() {
 	// Verifica o diretório compartilhado
 	err = verifySharedDirectory(myargs.Shared)
 	check(err)
+
+	// Cria uma goroutine/thread para a CLI
+	go cliInterface(myargs, requestClient)
 
 	// Inicializa o peer
 	listener(myargs, requestClient)
