@@ -1,5 +1,5 @@
 # EACHare
-Exercício Programa de Sistemas Distribuídos feito em Go
+Exercício Programa de Sistemas Distribuídos feito em Go, implementando um sistema de compartilhamento de arquivos peer-to-peer
 
 ## Instalação do Go
 Para o Ubuntu, é possível instalar pelo arquivo comprimido no site oficial ou usando o gerenciador de pacotes apt:
