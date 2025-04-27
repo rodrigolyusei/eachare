@@ -3,10 +3,7 @@ package main
 import "testing"
 
 func TestGetArgs(t *testing.T) {
-	myargs, err := getArgs([]string{"eachare", "localhost:8080", "vizinhos", "../shared"})
-	if err != nil {
-		t.Errorf("Error: %v", err)
-	}
+	myargs := getArgs([]string{"eachare", "localhost:8080", "vizinhos", "../shared"})
 
 	if myargs.Address != "localhost" {
 		t.Errorf("Addrs is casting invalid!")

@@ -17,7 +17,6 @@ import (
 	"EACHare/src/commands/message"
 	"EACHare/src/commands/request"
 	"EACHare/src/logger"
-	"EACHare/src/number"
 	"EACHare/src/peers"
 )
 
@@ -30,7 +29,6 @@ type SelfArgs struct {
 }
 
 // Variáveis globais
-var err error           // Armazena o erro
 var knownPeers sync.Map // Hashmap syncronizado para os peers conhecidos
 var myargs SelfArgs     // Armazena os parâmetros de si mesmo
 var waiting_cli = false // Variável para controlar o estado do CLI
@@ -48,10 +46,19 @@ func (args SelfArgs) FullAddress() string {
 }
 
 // Função para modo de teste, simulando a execução do programa com argumentos específicos
-func testArgs(args []string) (SelfArgs, error) {
-	// Obtém a porta a partir do número no data.txt
-	port, err := number.GetNextPort()
-	check(err)
+func testArgs(args []string) SelfArgs {
+	port := 10000
+
+	// Vai criando um listener TCP em portas diferentes até encontrar uma porta livre
+	for {
+		port++
+		listener, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+		if err != nil {
+			continue
+		}
+		listener.Close()
+		break
+	}
 
 	// Cria um mapa de peers dinamicamente
 	if port%2 == 0 {
@@ -71,34 +78,32 @@ func testArgs(args []string) (SelfArgs, error) {
 	fmt.Println("Vizinhos:", myargs.Neighbors)
 	fmt.Println("Diretório Compartilhado:", myargs.Shared)
 
-	return myargs, nil
+	return myargs
 }
 
 // Função para obter os argumentos de entrada
-func getArgs(args []string) (SelfArgs, error) {
+func getArgs(args []string) SelfArgs {
 	// Verifica a quantidade de parâmetros e o formato do endereço
 	if len(args) != 4 {
 		str1 := "\nParâmetros de entrada inválidos, por favor, siga o formato abaixo:"
 		str2 := "\n./eachare <endereço>:<porta> <vizinhos> <diretório compartilhado>"
-		return SelfArgs{}, errors.New(str1 + str2)
+		check(errors.New(str1 + str2))
 	} else if !strings.Contains(args[1], ":") {
 		str1 := "\nEndereço e porta inválidos, por favor, siga o formato abaixo:"
 		str2 := "\n./eachare <endereço>:<porta> <vizinhos> <diretório compartilhado>"
-		return SelfArgs{}, errors.New(str1 + str2)
+		check(errors.New(str1 + str2))
 	}
 
 	// Se os parâmetros estiverem corretos, retorna a struct preenchida
 	x := strings.Split(args[1], ":")
-	return SelfArgs{Address: x[0], Port: x[1], Neighbors: args[2], Shared: args[3]}, nil
+	return SelfArgs{Address: x[0], Port: x[1], Neighbors: args[2], Shared: args[3]}
 }
 
 // Função para adicionar vizinhos conhecidos a partir de um arquivo
-func addNeighbors(neighborsPath string) error {
+func addNeighbors(neighborsPath string) {
 	// Abre o arquivo de vizinhos
 	file, err := os.Open(neighborsPath)
-	if err != nil {
-		return err
-	}
+	check(err)
 	defer file.Close()
 
 	// Lê o arquivo linha por linha
@@ -107,13 +112,12 @@ func addNeighbors(neighborsPath string) error {
 		knownPeers.Store(scanner.Text(), peers.OFFLINE)
 		logger.Info("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String())
 	}
-	return nil
 }
 
 // Verifica se o diretório compartilhado existe e está acessível
-func verifySharedDirectory(sharedPath string) error {
+func verifySharedDirectory(sharedPath string) {
 	_, err := os.ReadDir(sharedPath)
-	return err
+	check(err)
 }
 
 // Função para iniciar o peer e escutar conexões
@@ -242,24 +246,21 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 func main() {
 	// Verifica se o programa está sendo executado em modo de teste ou não
 	if len(os.Args) == 5 && os.Args[4] == "--test" {
-		myargs, err = testArgs(os.Args)
-		check(err)
+		// Cria os argumentos de teste
+		myargs = testArgs(os.Args)
 	} else {
 		// Pega os argumentos de entrada
-		myargs, err = getArgs(os.Args)
-		check(err)
+		myargs = getArgs(os.Args)
 
-		// Adiciona os vizinhos conhecidos pelo arquivo de vizinhos
-		err = addNeighbors(myargs.Neighbors)
-		check(err)
+		// Adiciona os vizinhos conhecidos no arquivo de vizinhos
+		addNeighbors(myargs.Neighbors)
 	}
 
 	// Cria o cliente de requisições que será usado para enviar mensagens
 	requestClient := request.RequestClient{Address: myargs.FullAddress()}
 
 	// Verifica o diretório compartilhado
-	err = verifySharedDirectory(myargs.Shared)
-	check(err)
+	verifySharedDirectory(myargs.Shared)
 
 	// Cria uma goroutine/thread para a CLI
 	go cliInterface(myargs, requestClient)
