@@ -23,9 +23,10 @@ func check(err error) {
 	}
 }
 
-// Função para receber mensagem
+// Função para construir a mensagem a partir da string recebida
 func ReceiveMessage(receivedMessage string) message.BaseMessage {
 	// Recupera as partes da mensagem
+	receivedMessage = strings.TrimSuffix(receivedMessage, "\n")
 	messageParts := strings.Split(receivedMessage, " ")
 
 	// Imprime a mensagem/resposta recebida e atualiza o clock

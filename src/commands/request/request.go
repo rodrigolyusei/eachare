@@ -38,8 +38,8 @@ func (r RequestClient) sendMessage(connection net.Conn, message message.BaseMess
 		return errors.New("connection is nil")
 	}
 
-	// Envia a mensagem pela conexão
-	_, err := connection.Write([]byte(message.String()))
+	// Envia a mensagem pela conexão, adicionando delimitador \n
+	_, err := connection.Write([]byte(message.String() + "\n"))
 	return err
 }
 

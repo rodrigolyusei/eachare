@@ -144,13 +144,12 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 		logger.Std("\n\n")
 	}
 
-	// Buffer para armazenar os dados recebidos da conexão
-	buf := make([]byte, 1024)
-	_, err := conn.Read(buf)
+	// Lê a mensagem recebida no buffer até encontrar \n
+	msg, err := bufio.NewReader(conn).ReadString('\n')
 	check(err)
 
-	// Decodifica os dados recebidos em string
-	receivedMessage := commands.ReceiveMessage(string(buf))
+	// Formata a string recebida para o tipo BaseMessage
+	receivedMessage := commands.ReceiveMessage(msg)
 
 	// Verifica se a mensagem recebida é de um peer conhecido
 	status, exists := knownPeers.Load(receivedMessage.Origin)
