@@ -67,7 +67,7 @@ func (r RequestClient) HelloRequest(receiverAddress string) peers.PeerStatus {
 func (r RequestClient) GetPeersRequest(knownPeers *sync.Map) []net.Conn {
 	// Cria um slice de conexões e a estrutura da mensagem GET_PEERS
 	peerCount := 0
-	knownPeers.Range(func(_, _ interface{}) bool {
+	knownPeers.Range(func(_, _ any) bool {
 		peerCount++
 		return true
 	})
@@ -75,7 +75,7 @@ func (r RequestClient) GetPeersRequest(knownPeers *sync.Map) []net.Conn {
 	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.GET_PEERS, Arguments: nil}
 
 	// Itera sobre os peers conhecidos
-	knownPeers.Range(func(key, value interface{}) bool {
+	knownPeers.Range(func(key, value any) bool {
 		address := key.(string)
 
 		// Tenta conectar e se conectar, adiciona a conexão à lista e define o deadline de 2 segundos
@@ -111,14 +111,14 @@ func (r RequestClient) GetPeersRequest(knownPeers *sync.Map) []net.Conn {
 func (r RequestClient) PeersListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers *sync.Map) {
 	// Cria uma lista de strings para os peers conhecidos
 	peerCount := 0
-	knownPeers.Range(func(_, _ interface{}) bool {
+	knownPeers.Range(func(_, _ any) bool {
 		peerCount++
 		return true
 	})
 	myPeers := make([]string, 0, peerCount)
 
 	// Adicioona cada peer que conhece na lista, exceto quem pediu a lista
-	knownPeers.Range(func(key, value interface{}) bool {
+	knownPeers.Range(func(key, value any) bool {
 		addressPort := key.(string)
 		peerStatus := value.(peers.PeerStatus)
 
@@ -142,7 +142,7 @@ func (r RequestClient) ByeRequest(knownPeers *sync.Map, exit *bool) {
 	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.BYE, Arguments: nil}
 
 	// Itera sobre os peers conhecidos
-	knownPeers.Range(func(key, value interface{}) bool {
+	knownPeers.Range(func(key, value any) bool {
 		addressPort := key.(string)
 		// Tenta conectar e se conectar define o deadline de 2 segundos
 		conn, _ := net.Dial("tcp", addressPort)
