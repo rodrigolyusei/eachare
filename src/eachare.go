@@ -16,6 +16,7 @@ import (
 	"EACHare/src/commands"
 	"EACHare/src/commands/message"
 	"EACHare/src/commands/request"
+	"EACHare/src/commands/response"
 	"EACHare/src/logger"
 	"EACHare/src/peers"
 )
@@ -31,7 +32,7 @@ type SelfArgs struct {
 // Variáveis globais
 var knownPeers sync.Map // Hashmap syncronizado para os peers conhecidos
 var myargs SelfArgs     // Armazena os parâmetros de si mesmo
-var waiting_cli = false // Variável para controlar o estado do CLI
+var waitingCli = false  // Variável para controlar o estado do CLI
 
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
@@ -144,7 +145,7 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 	defer conn.Close()
 
 	// Se a CLI está esperando por uma entrada, imprime nova linha para formatação
-	if waiting_cli {
+	if waitingCli {
 		logger.Std("\n\n")
 	}
 
@@ -171,15 +172,15 @@ func receiver(conn net.Conn, requestClient request.RequestClient) {
 	// Lida o comando recebido de acordo com o tipo de mensagem
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
-		commands.GetPeersResponse(receivedMessage, &knownPeers, conn, requestClient)
+		response.GetPeersResponse(receivedMessage, &knownPeers, conn, requestClient)
 	case message.PEERS_LIST:
-		commands.PeersListResponse(receivedMessage, &knownPeers)
+		response.PeersListResponse(receivedMessage, &knownPeers)
 	case message.BYE:
-		commands.ByeResponse(receivedMessage, &knownPeers)
+		response.ByeResponse(receivedMessage, &knownPeers)
 	}
 
 	// Verifica se a CLI está esperando por uma entrada
-	if waiting_cli {
+	if waitingCli {
 		logger.Std("\n> ")
 	}
 }
@@ -193,7 +194,7 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 	// Loop para manter a CLI ativa
 	for !exit {
 		// Indica que a CLI está esperando por uma entrada
-		waiting_cli = true
+		waitingCli = true
 
 		// Imprime o menu de opções
 		fmt.Println("\nEscolha um comando:")
@@ -234,7 +235,7 @@ func cliInterface(args SelfArgs, requestClient request.RequestClient) {
 		}
 
 		// Indica que a CLI não está mais esperando por uma entrada
-		waiting_cli = false
+		waitingCli = false
 		time.Sleep(500 * time.Millisecond)
 	}
 
