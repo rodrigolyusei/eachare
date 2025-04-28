@@ -34,7 +34,7 @@ func PeersListResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map
 		_, exists := knownPeers.Load(peerAddress)
 		if !exists {
 			logger.Info("\tAdicionando novo peer " + peerAddress + " status " + peerArgs[2])
-			knownPeers.Store(peerAddress, peers.GetStatus(peerArgs[2]))
+			knownPeers.Store(peerAddress, peers.Peer{Status: peers.GetStatus(peerArgs[2]), Clock: 0})
 		}
 	}
 }
