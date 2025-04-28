@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 
-	"EACHare/src/clock"
-	"EACHare/src/commands/message"
 	"EACHare/src/commands/request"
 	"EACHare/src/logger"
 	"EACHare/src/peers"
@@ -19,33 +16,6 @@ import (
 func check(err error) {
 	if err != nil {
 		panic(err)
-	}
-}
-
-// Função para construir a mensagem a partir da string recebida
-func ReceiveMessage(receivedMessage string) message.BaseMessage {
-	// Recupera as partes da mensagem
-	receivedMessage = strings.TrimSuffix(receivedMessage, "\n")
-	messageParts := strings.Split(receivedMessage, " ")
-
-	// Imprime a mensagem/resposta recebida e atualiza o clock
-	if messageParts[2] == "PEERS_LIST" {
-		logger.Info("\tResposta recebida: \"" + receivedMessage + "\"")
-	} else {
-		logger.Info("\tMensagem recebida: \"" + receivedMessage + "\"")
-	}
-	clock.UpdateClock()
-
-	// Guarda o valor do clock da mensagem recebida
-	receivedClock, err := strconv.Atoi(messageParts[1])
-	check(err)
-
-	// Monta a mensagem e retorna ela
-	return message.BaseMessage{
-		Origin:    messageParts[0],
-		Clock:     receivedClock,
-		Type:      message.GetMessageType(messageParts[2]),
-		Arguments: messageParts[3:],
 	}
 }
 
