@@ -29,6 +29,19 @@ func UpdateClock() int {
 	return safeClock.Clock
 }
 
+// Função para atualizar o relógio entre o valor local e o recebido
+func UpdateMaxClock(clockRecebido int) int {
+	// Bloqueia o mutex para garantir acesso exclusivo ao relógio
+	safeClock.Mutex.Lock()
+	defer safeClock.Mutex.Unlock()
+
+	// Incrementa o relógio e imprime a mensagem de atualização
+	safeClock.Clock = max(safeClock.Clock, clockRecebido)
+	safeClock.Clock++
+	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(safeClock.Clock))
+	return safeClock.Clock
+}
+
 // Função para reiniciar o relógio
 func ResetClock() {
 	// Bloqueia o mutex para garantir acesso exclusivo ao relógio
