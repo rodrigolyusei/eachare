@@ -80,7 +80,7 @@ func TestGetPeersRequest(t *testing.T) {
 		t.Fatalf("Expected no connections, got %d", len(conns))
 	}
 
-	knownPeers.Range(func(key, value interface{}) bool {
+	knownPeers.Range(func(key, value any) bool {
 		peerStatus := value.(peers.PeerStatus)
 		if peerStatus {
 			t.Errorf("Expected peer status to be false, got true")
