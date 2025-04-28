@@ -117,7 +117,7 @@ func TestByeRequest(t *testing.T) {
 
 func TestPeerListRequest(t *testing.T) {
 	var knownPeers sync.Map
-	knownPeers.Store("127.0.0.2:9002", peers.OFFLINE)
+	knownPeers.Store("127.0.0.2:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
 
 	receivedMessage := message.BaseMessage{
 		Origin:    "127.0.0.1:9001",
@@ -138,12 +138,11 @@ func TestPeerListRequest(t *testing.T) {
 }
 
 func TestHelloRequestOffline(t *testing.T) {
+	var knownPeers sync.Map
+	knownPeers.Store("127.0.0.2:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
+
 	client := RequestClient{Address: "localhost"}
 	receiverAddress := "invalid-address:9999"
 
-	status := client.HelloRequest(receiverAddress)
-
-	if status != peers.OFFLINE {
-		t.Errorf("Expected peer to be OFFLINE, got %v", status)
-	}
+	client.HelloRequest(receiverAddress, &knownPeers)
 }

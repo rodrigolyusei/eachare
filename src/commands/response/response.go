@@ -13,12 +13,12 @@ import (
 	"EACHare/src/peers"
 )
 
-// Função para responder ao get peers recebido
+// Função para lidar com o GET_PEERS recebido
 func GetPeersResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map, conn net.Conn, requestClient request.IRequest) {
 	requestClient.PeersListRequest(conn, receivedMessage, knownPeers)
 }
 
-// Função para responder ao peers list recebido
+// Função para lidar com o PEERS_LIST recebido
 func PeersListResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map) {
 	// Conta quantos peers foram recebidos na mensagem
 	peersCount, err := strconv.Atoi(receivedMessage.Arguments[0])
@@ -29,18 +29,18 @@ func PeersListResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map
 
 	// Para cada peer na mensagem adiciona nos peers conhecidos
 	for i := range peersCount {
-		peerInfos := strings.Split(receivedMessage.Arguments[1+i], ":")
-		newPeer := peers.Peer{Address: peerInfos[0], Port: peerInfos[1], Status: peers.GetStatus(peerInfos[2])}
-		_, exists := knownPeers.Load(newPeer.FullAddress())
+		peerArgs := strings.Split(receivedMessage.Arguments[i+1], ":")
+		peerAddress := peerArgs[0] + ":" + peerArgs[1]
+		_, exists := knownPeers.Load(peerAddress)
 		if !exists {
-			logger.Info("\tAdicionando novo peer " + newPeer.FullAddress() + " status " + newPeer.Status.String())
-			knownPeers.Store(newPeer.FullAddress(), newPeer.Status)
+			logger.Info("\tAdicionando novo peer " + peerAddress + " status " + peerArgs[2])
+			knownPeers.Store(peerAddress, peers.GetStatus(peerArgs[2]))
 		}
 	}
 }
 
 // Função para lidar com o BYE recebido
-func ByeResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map) {
-	knownPeers.Store(receivedMessage.Origin, peers.OFFLINE)
+func ByeResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map, neighborClock int) {
+	knownPeers.Store(receivedMessage.Origin, peers.Peer{Status: peers.OFFLINE, Clock: neighborClock})
 	logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
 }

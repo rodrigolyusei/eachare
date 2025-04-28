@@ -64,11 +64,11 @@ func testArgs(args []string) SelfArgs {
 
 	// Cria um mapa de peers dinamicamente
 	if port%2 == 0 {
-		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+1), peers.ONLINE)
-		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+2), peers.OFFLINE)
+		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+1), peers.Peer{Status: peers.ONLINE, Clock: 0})
+		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+2), peers.Peer{Status: peers.OFFLINE, Clock: 0})
 	} else {
-		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+1), peers.ONLINE)
-		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+3), peers.OFFLINE)
+		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+1), peers.Peer{Status: peers.ONLINE, Clock: 0})
+		knownPeers.Store("127.0.0.1:"+strconv.Itoa(port+3), peers.Peer{Status: peers.OFFLINE, Clock: 0})
 	}
 
 	// Cria o SelfArgs com os argumentos de teste
@@ -111,7 +111,7 @@ func addNeighbors(neighborsPath string) {
 	// Lê o arquivo linha por linha
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		knownPeers.Store(scanner.Text(), peers.OFFLINE)
+		knownPeers.Store(scanner.Text(), peers.Peer{Status: peers.OFFLINE, Clock: 0})
 		logger.Info("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String())
 	}
 }
@@ -169,9 +169,10 @@ func receiveMessage(conn net.Conn, requestClient request.RequestClient) {
 	receivedClock, err := strconv.Atoi(msgParts[1])
 	check(err)
 
+	// Atualiza o relógio local comparando o valor local e recebido
 	clock.UpdateMaxClock(receivedClock)
 
-	// Monta a mensagem e retorna ela
+	// Monta a mensagem recebida
 	receivedMessage := message.BaseMessage{
 		Origin:    msgParts[0],
 		Clock:     receivedClock,
@@ -180,26 +181,36 @@ func receiveMessage(conn net.Conn, requestClient request.RequestClient) {
 	}
 
 	// Verifica se a mensagem recebida é de um peer conhecido
-	status, exists := knownPeers.Load(receivedMessage.Origin)
+	neighbor, exists := knownPeers.Load(receivedMessage.Origin)
+	if exists {
+		neighborStatus := neighbor.(peers.Peer).Status
+		neighborClock := neighbor.(peers.Peer).Clock
 
-	// Mensagem para o caso do peer não ser conhecido ou não estar online
-	if !exists {
+		// Atualiza o status do peer conhecido com o maior clock
+		if receivedClock > neighborClock {
+			knownPeers.Store(receivedMessage.Origin, peers.Peer{Status: peers.ONLINE, Clock: receivedClock})
+		} else {
+			knownPeers.Store(receivedMessage.Origin, peers.Peer{Status: peers.ONLINE, Clock: neighborClock})
+		}
+
+		// Mostra mensagem de atualização apenas se for de peer OFFLINE e não for uma mensagem de BYE
+		if neighborStatus == peers.OFFLINE && receivedMessage.Type != message.BYE {
+			logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+		}
+	} else {
+		knownPeers.Store(receivedMessage.Origin, peers.Peer{Status: peers.ONLINE, Clock: receivedClock})
 		logger.Info("\tAdicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
-	} else if status == peers.OFFLINE && receivedMessage.Type != message.BYE {
-		logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 	}
 
-	// Adiciona o peer nos conhecido com status ONLINE
-	knownPeers.Store(receivedMessage.Origin, peers.ONLINE)
-
 	// Lida o comando recebido de acordo com o tipo de mensagem
+	neighbor, _ = knownPeers.Load(receivedMessage.Origin)
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
 		response.GetPeersResponse(receivedMessage, &knownPeers, conn, requestClient)
 	case message.PEERS_LIST:
 		response.PeersListResponse(receivedMessage, &knownPeers)
 	case message.BYE:
-		response.ByeResponse(receivedMessage, &knownPeers)
+		response.ByeResponse(receivedMessage, &knownPeers, neighbor.(peers.Peer).Clock)
 	}
 
 	// Verifica se a CLI está esperando por uma entrada

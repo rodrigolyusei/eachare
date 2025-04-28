@@ -14,6 +14,7 @@ type Peer struct {
 	Address string
 	Port    string
 	Status  PeerStatus
+	Clock   int
 }
 
 // Função para obter o endereço completo a partir do Peer
