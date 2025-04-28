@@ -164,11 +164,12 @@ func receiveMessage(conn net.Conn, requestClient request.RequestClient) {
 	} else {
 		logger.Info("\tMensagem recebida: \"" + msg + "\"")
 	}
-	clock.UpdateClock()
 
 	// Guarda o valor do clock da mensagem recebida
 	receivedClock, err := strconv.Atoi(msgParts[1])
 	check(err)
+
+	clock.UpdateMaxClock(receivedClock)
 
 	// Monta a mensagem e retorna ela
 	receivedMessage := message.BaseMessage{
