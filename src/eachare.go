@@ -25,7 +25,6 @@ import (
 // Struct para os argumentos de entrada, sendo as informações do Peer próprio
 type SelfArgs struct {
 	Address   string
-	Port      string
 	Neighbors string
 	Shared    string
 }
@@ -40,11 +39,6 @@ func check(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-// Método do SelfArgs para retornar o endereço completo (endereço:porta)
-func (args SelfArgs) FullAddress() string {
-	return args.Address + ":" + args.Port
 }
 
 // Função para modo de teste, simulando a execução do programa com argumentos específicos
@@ -72,11 +66,10 @@ func testArgs(args []string) SelfArgs {
 	}
 
 	// Cria o SelfArgs com os argumentos de teste
-	myargs := SelfArgs{Address: "127.0.0.1", Port: strconv.Itoa(port), Neighbors: args[2], Shared: args[3]}
+	myargs := SelfArgs{Address: "127.0.0.1" + strconv.Itoa(port), Neighbors: args[2], Shared: args[3]}
 
 	// Imprime os parâmetros de entrada
 	fmt.Println("Endereço:", myargs.Address)
-	fmt.Println("Porta:", myargs.Port)
 	fmt.Println("Vizinhos:", myargs.Neighbors)
 	fmt.Println("Diretório Compartilhado:", myargs.Shared)
 
@@ -97,8 +90,7 @@ func getArgs(args []string) SelfArgs {
 	}
 
 	// Se os parâmetros estiverem corretos, retorna a struct preenchida
-	x := strings.Split(args[1], ":")
-	return SelfArgs{Address: x[0], Port: x[1], Neighbors: args[2], Shared: args[3]}
+	return SelfArgs{Address: args[1], Neighbors: args[2], Shared: args[3]}
 }
 
 // Função para adicionar vizinhos conhecidos a partir de um arquivo
@@ -125,7 +117,7 @@ func verifySharedDirectory(sharedPath string) {
 // Função para iniciar o peer e escutar conexões
 func listener(args SelfArgs, requestClient request.RequestClient) {
 	// Cria um listener TCP no endereço e porta especificado
-	listener, err := net.Listen("tcp", args.FullAddress())
+	listener, err := net.Listen("tcp", args.Address)
 	check(err)
 	defer listener.Close()
 
@@ -292,7 +284,7 @@ func main() {
 	}
 
 	// Cria o cliente de requisições que será usado para enviar mensagens
-	requestClient := request.RequestClient{Address: myargs.FullAddress()}
+	requestClient := request.RequestClient{Address: myargs.Address}
 
 	// Verifica o diretório compartilhado
 	verifySharedDirectory(myargs.Shared)
