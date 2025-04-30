@@ -136,11 +136,6 @@ func receiveMessage(conn net.Conn, knownPeers *sync.Map, requestClient request.R
 	// defer(adia) a função de fechamento da conexão quando as operações terminarem
 	defer conn.Close()
 
-	// Se a CLI está esperando por uma entrada, imprime nova linha para formatação
-	if waitingCli {
-		logger.Std("\n\n")
-	}
-
 	// Lê a mensagem recebida no buffer até encontrar \n
 	msg, err := bufio.NewReader(conn).ReadString('\n')
 	check(err)
@@ -148,6 +143,11 @@ func receiveMessage(conn net.Conn, knownPeers *sync.Map, requestClient request.R
 	// Recupera as partes da mensagem
 	msg = strings.TrimSuffix(msg, "\n")
 	msgParts := strings.Split(msg, " ")
+
+	// Se a CLI está esperando por uma entrada e não é um PEERS_LIST, formata
+	if waitingCli && msgParts[2] != "PEERS_LIST" {
+		logger.Std("\n\n")
+	}
 
 	// Imprime a mensagem/resposta recebida e atualiza o clock
 	if msgParts[2] == "PEERS_LIST" {
@@ -205,7 +205,7 @@ func receiveMessage(conn net.Conn, knownPeers *sync.Map, requestClient request.R
 	}
 
 	// Verifica se a CLI está esperando por uma entrada
-	if waitingCli {
+	if waitingCli && msgParts[2] != "PEERS_LIST" {
 		logger.Std("\n> ")
 	}
 }
