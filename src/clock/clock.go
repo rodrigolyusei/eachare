@@ -42,16 +42,6 @@ func UpdateMaxClock(clockRecebido int) int {
 	return safeClock.Clock
 }
 
-// Função para reiniciar o relógio
-func ResetClock() {
-	// Bloqueia o mutex para garantir acesso exclusivo ao relógio
-	safeClock.Mutex.Lock()
-	defer safeClock.Mutex.Unlock()
-
-	// Reinicia o relógio
-	safeClock.Clock = 0
-}
-
 // Função para obter o valor atual do relógio
 func GetClock() int {
 	// Bloqueia o mutex para garantir acesso exclusivo ao relógio

@@ -1,7 +1,6 @@
 package request
 
 import (
-	"EACHare/src/clock"
 	"EACHare/src/commands/message"
 	"EACHare/src/logger"
 	"EACHare/src/peers"
@@ -18,7 +17,6 @@ func init() {
 }
 
 func TestSendMessageArgumentsNilOK(t *testing.T) {
-	clock.ResetClock()
 	conn := &mockConn{}
 	message := message.BaseMessage{
 		Origin:    requestClient.Address,
@@ -32,14 +30,13 @@ func TestSendMessageArgumentsNilOK(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	expected := "localhost 1 UNKNOWN"
+	expected := "localhost 1 UNKNOWN\n"
 	if string(conn.data) != expected {
 		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
 	}
 }
 
 func TestSendMessageConnNil(t *testing.T) {
-	clock.ResetClock()
 	message := message.BaseMessage{
 		Origin:    requestClient.Address,
 		Clock:     0,
@@ -54,7 +51,6 @@ func TestSendMessageConnNil(t *testing.T) {
 }
 
 func TestSendMessageWriteError(t *testing.T) {
-	clock.ResetClock()
 	conn := &mockConn{}
 	message := message.BaseMessage{
 		Origin:    requestClient.Address + "testingWriteError",
@@ -71,8 +67,8 @@ func TestSendMessageWriteError(t *testing.T) {
 
 func TestGetPeersRequest(t *testing.T) {
 	var knownPeers sync.Map
-	knownPeers.Store("127.0.0.1:9001", peers.ONLINE)
-	knownPeers.Store("127.0.0.2:9002", peers.OFFLINE)
+	knownPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
+	knownPeers.Store("127.0.0.2:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
 
 	conns := requestClient.GetPeersRequest(&knownPeers)
 
@@ -92,8 +88,8 @@ func TestGetPeersRequest(t *testing.T) {
 
 func TestByeRequest(t *testing.T) {
 	var knownPeers sync.Map
-	knownPeers.Store("127.0.0.1:9001", peers.ONLINE)
-	knownPeers.Store("127.0.0.2:9002", peers.OFFLINE)
+	knownPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
+	knownPeers.Store("127.0.0.2:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
 
 	var buffer bytes.Buffer
 	var exit bool = false

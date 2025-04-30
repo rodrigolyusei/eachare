@@ -204,7 +204,7 @@ func receiveMessage(conn net.Conn, knownPeers *sync.Map, requestClient request.R
 		response.ByeResponse(receivedMessage, knownPeers, neighbor.(peers.Peer).Clock)
 	}
 
-	// Verifica se a CLI está esperando por uma entrada
+	// Verifica se a CLI está esperando por uma entrada e não é um PEERS_LIST
 	if waitingCli && msgParts[2] != "PEERS_LIST" {
 		logger.Std("\n> ")
 	}
