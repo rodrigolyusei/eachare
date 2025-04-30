@@ -19,7 +19,7 @@ type IRequest interface {
 	HelloRequest(receiverAddress string, knownPeers *sync.Map)
 	GetPeersRequest(knownPeers *sync.Map) []net.Conn
 	PeersListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers *sync.Map)
-	ByeRequest(knownPeers *sync.Map, exit *bool)
+	ByeRequest(knownPeers *sync.Map)
 }
 
 // Estrutura para o cliente que faz requisições
@@ -117,22 +117,18 @@ func (r RequestClient) GetPeersRequest(knownPeers *sync.Map) []net.Conn {
 // Função para mensagem PEER_LIST, envia os meus peers conhecidos para quem solicitou
 func (r RequestClient) PeersListRequest(conn net.Conn, receivedMessage message.BaseMessage, knownPeers *sync.Map) {
 	// Cria uma lista de strings para os peers conhecidos
-	peerCount := 0
-	knownPeers.Range(func(_, _ any) bool {
-		peerCount++
-		return true
-	})
-	myPeers := make([]string, 0, peerCount)
+	myPeers := make([]string, 0)
 
 	// Adicioona cada peer que conhece na lista, exceto quem pediu a lista
 	knownPeers.Range(func(key, value any) bool {
 		address := key.(string)
-		peer := value.(peers.Peer).Status
+		neighbor := value.(peers.Peer)
 
 		if address == receivedMessage.Origin {
 			return true
 		}
-		myPeers = append(myPeers, address+":"+peer.String()+":"+"0")
+
+		myPeers = append(myPeers, address+":"+neighbor.Status.String()+":"+strconv.Itoa(neighbor.Clock))
 		return true
 	})
 
@@ -143,7 +139,7 @@ func (r RequestClient) PeersListRequest(conn net.Conn, receivedMessage message.B
 }
 
 // Função para mensagem BYE, avisando os peers sobre a saída
-func (r RequestClient) ByeRequest(knownPeers *sync.Map, exit *bool) {
+func (r RequestClient) ByeRequest(knownPeers *sync.Map) {
 	// Imprime mensagem de saída e cria a mensagem BYE
 	logger.Info("Saindo...")
 	baseMessage := message.BaseMessage{Origin: r.Address, Clock: 0, Type: message.BYE, Arguments: nil}
@@ -160,7 +156,4 @@ func (r RequestClient) ByeRequest(knownPeers *sync.Map, exit *bool) {
 		r.sendMessage(conn, baseMessage, addressPort)
 		return true
 	})
-
-	// Altera a saída como verdadeiro para finalizar o programa
-	*exit = true
 }

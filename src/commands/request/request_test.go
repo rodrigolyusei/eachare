@@ -92,11 +92,10 @@ func TestByeRequest(t *testing.T) {
 	knownPeers.Store("127.0.0.2:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
 
 	var buffer bytes.Buffer
-	var exit bool = false
 
 	logger.SetOutput(&buffer)
 
-	requestClient.ByeRequest(&knownPeers, &exit)
+	requestClient.ByeRequest(&knownPeers)
 
 	out := buffer.String()
 	expected := `Saindo...

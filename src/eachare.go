@@ -115,11 +115,9 @@ func verifySharedDirectory() {
 
 // Função para a CLI/menu de interação com o usuário
 func cliInterface(requestClient request.RequestClient) {
-	// Variável para o comando digitado e a saída
+	// Declara variável para o comando e saída, depois inicia o loop do menu
 	var comm string
 	var exit bool = false
-
-	// Loop para manter a CLI ativa
 	for !exit {
 		// Indica que a CLI está esperando por uma entrada
 		waitingCli = true
@@ -157,7 +155,8 @@ func cliInterface(requestClient request.RequestClient) {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			requestClient.ByeRequest(&knownPeers, &exit)
+			requestClient.ByeRequest(&knownPeers)
+			exit = true
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
 		}
