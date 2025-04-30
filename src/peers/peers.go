@@ -5,8 +5,8 @@ type PeerStatus bool
 
 // Constantes para os status booleanos
 const (
-	ONLINE  PeerStatus = true
 	OFFLINE PeerStatus = false
+	ONLINE  PeerStatus = true
 )
 
 // Estrutura para armazenar informações do peer conhecido

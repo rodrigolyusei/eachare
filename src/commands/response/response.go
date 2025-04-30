@@ -14,7 +14,7 @@ import (
 )
 
 // Função para lidar com o GET_PEERS recebido
-func GetPeersResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map, conn net.Conn, requestClient request.IRequest) {
+func GetPeersResponse(conn net.Conn, receivedMessage message.BaseMessage, knownPeers *sync.Map, requestClient request.IRequest) {
 	requestClient.PeersListRequest(conn, receivedMessage, knownPeers)
 }
 

@@ -20,28 +20,25 @@ func check(err error) {
 
 // Função para listar os peers conhecidos e enviar HELLO para o peer escolhido
 func ListPeers(knownPeers *sync.Map, requestClient request.IRequest) {
-	// Conta os peers conhecidos e armazena os endereços
-	var addrList []string
-	var statusList []peers.PeerStatus
-	knownPeers.Range(func(key, value any) bool {
-		addr := key.(string)
-		neighbor := value.(peers.Peer)
-		neighborStatus := neighbor.Status
-
-		addrList = append(addrList, addr)
-		statusList = append(statusList, neighborStatus)
-		return true
-	})
-
+	// Declara variável para o comando e inicia o loop do menu
 	var comm string
-	var exit bool = false
-	for !exit {
+	for {
 		// Imprime o menu de opções
 		fmt.Println("Lista de peers: ")
 		fmt.Println("\t[0] voltar para o menu anterior")
-		for i, addr := range addrList {
-			fmt.Println("\t[" + strconv.Itoa(i+1) + "] " + addr + " " + statusList[i].String())
-		}
+
+		// Enquanto lista os peers, cria um slice dos endereços para enviar o HELLO
+		var i int = 0
+		var addrList []string
+		knownPeers.Range(func(key, value any) bool {
+			addr := key.(string)
+			neighbor := value.(peers.Peer)
+			addrList = append(addrList, addr)
+
+			fmt.Println("\t[" + strconv.Itoa(i+1) + "] " + addr + " " + neighbor.Status.String())
+			i++
+			return true
+		})
 
 		// Lê a entrada do usuário
 		fmt.Print("> ")
@@ -57,10 +54,10 @@ func ListPeers(knownPeers *sync.Map, requestClient request.IRequest) {
 
 		// Envio de mensagem para o destino escolhido
 		if number == 0 {
-			exit = true
+			break
 		} else if number > 0 && number <= len(addrList) {
 			requestClient.HelloRequest(addrList[number-1], knownPeers)
-			exit = true
+			break
 		} else {
 			fmt.Println("Opção inválida, tente novamente.")
 		}

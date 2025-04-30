@@ -113,6 +113,64 @@ func verifySharedDirectory() {
 	check(err)
 }
 
+// Função para a CLI/menu de interação com o usuário
+func cliInterface(requestClient request.RequestClient) {
+	// Variável para o comando digitado e a saída
+	var comm string
+	var exit bool = false
+
+	// Loop para manter a CLI ativa
+	for !exit {
+		// Indica que a CLI está esperando por uma entrada
+		waitingCli = true
+
+		// Imprime o menu de opções
+		fmt.Println("\nEscolha um comando:")
+		fmt.Println("\t[1] Listar peers")
+		fmt.Println("\t[2] Obter peers")
+		fmt.Println("\t[3] Listar arquivos locais")
+		fmt.Println("\t[4] Buscar arquivos")
+		fmt.Println("\t[5] Exibir estatisticas")
+		fmt.Println("\t[6] Alterar tamanho de chunk")
+		fmt.Println("\t[9] Sair")
+
+		// Lê a entrada do usuário
+		fmt.Print("> ")
+		fmt.Scanln(&comm)
+		fmt.Println()
+
+		// Executa o comando correspondente
+		switch comm {
+		case "1":
+			commands.ListPeers(&knownPeers, requestClient)
+		case "2":
+			connections := requestClient.GetPeersRequest(&knownPeers)
+			for _, conn := range connections {
+				go receiveMessage(conn, &knownPeers, requestClient, waitingCli)
+			}
+		case "3":
+			commands.ListLocalFiles(myArgs.Shared)
+		case "4":
+			fmt.Println("Comando ainda não implementado")
+		case "5":
+			fmt.Println("Comando ainda não implementado")
+		case "6":
+			fmt.Println("Comando ainda não implementado")
+		case "9":
+			requestClient.ByeRequest(&knownPeers, &exit)
+		default:
+			fmt.Println("Comando inválido, tente novamente.")
+		}
+
+		// Indica que a CLI não está mais esperando por uma entrada
+		waitingCli = false
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	// Encerra o programa
+	os.Exit(0)
+}
+
 // Função para iniciar o peer e escutar conexões
 func listener(requestClient request.RequestClient) {
 	// Cria um listener TCP no endereço e porta especificado
@@ -197,7 +255,7 @@ func receiveMessage(conn net.Conn, knownPeers *sync.Map, requestClient request.R
 	neighbor, _ = knownPeers.Load(receivedMessage.Origin)
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
-		response.GetPeersResponse(receivedMessage, knownPeers, conn, requestClient)
+		response.GetPeersResponse(conn, receivedMessage, knownPeers, requestClient)
 	case message.PEERS_LIST:
 		response.PeersListResponse(receivedMessage, knownPeers)
 	case message.BYE:
@@ -208,64 +266,6 @@ func receiveMessage(conn net.Conn, knownPeers *sync.Map, requestClient request.R
 	if waitingCli && msgParts[2] != "PEERS_LIST" {
 		logger.Std("\n> ")
 	}
-}
-
-// Função para a CLI/menu de interação com o usuário
-func cliInterface(requestClient request.RequestClient) {
-	// Variável para o comando digitado e a saída
-	var comm string
-	var exit bool = false
-
-	// Loop para manter a CLI ativa
-	for !exit {
-		// Indica que a CLI está esperando por uma entrada
-		waitingCli = true
-
-		// Imprime o menu de opções
-		fmt.Println("\nEscolha um comando:")
-		fmt.Println("\t[1] Listar peers")
-		fmt.Println("\t[2] Obter peers")
-		fmt.Println("\t[3] Listar arquivos locais")
-		fmt.Println("\t[4] Buscar arquivos")
-		fmt.Println("\t[5] Exibir estatisticas")
-		fmt.Println("\t[6] Alterar tamanho de chunk")
-		fmt.Println("\t[9] Sair")
-
-		// Lê a entrada do usuário
-		fmt.Print("> ")
-		fmt.Scanln(&comm)
-		fmt.Println()
-
-		// Executa o comando correspondente
-		switch comm {
-		case "1":
-			commands.ListPeers(&knownPeers, requestClient)
-		case "2":
-			connections := requestClient.GetPeersRequest(&knownPeers)
-			for _, conn := range connections {
-				go receiveMessage(conn, &knownPeers, requestClient, waitingCli)
-			}
-		case "3":
-			commands.ListLocalFiles(myArgs.Shared)
-		case "4":
-			fmt.Println("Comando ainda não implementado")
-		case "5":
-			fmt.Println("Comando ainda não implementado")
-		case "6":
-			fmt.Println("Comando ainda não implementado")
-		case "9":
-			requestClient.ByeRequest(&knownPeers, &exit)
-		default:
-			fmt.Println("Comando inválido, tente novamente.")
-		}
-
-		// Indica que a CLI não está mais esperando por uma entrada
-		waitingCli = false
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	// Encerra o programa
-	os.Exit(0)
 }
 
 // Função principal do programa
