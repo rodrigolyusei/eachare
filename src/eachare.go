@@ -228,13 +228,13 @@ func receiveMessage(conn net.Conn, knownPeers *sync.Map, requestClient request.R
 		Arguments: msgParts[3:],
 	}
 
-	// Verifica se a mensagem recebida é de um peer conhecido
+	// Verifica as condições para atualizar ou adicionar o peer recebido
 	neighbor, exists := knownPeers.Load(receivedMessage.Origin)
 	if exists {
 		neighborStatus := neighbor.(peers.Peer).Status
 		neighborClock := neighbor.(peers.Peer).Clock
 
-		// Atualiza o status do peer conhecido com o maior clock
+		// Atualiza o status para online e o clock com o que tiver maior valor
 		if receivedClock > neighborClock {
 			knownPeers.Store(receivedMessage.Origin, peers.Peer{Status: peers.ONLINE, Clock: receivedClock})
 		} else {

@@ -29,12 +29,32 @@ func PeersListResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map
 
 	// Para cada peer na mensagem adiciona nos peers conhecidos
 	for i := range peersCount {
+		// Divide a string do peer em partes e salva cada parte
 		peerArgs := strings.Split(receivedMessage.Arguments[i+1], ":")
 		peerAddress := peerArgs[0] + ":" + peerArgs[1]
-		_, exists := knownPeers.Load(peerAddress)
-		if !exists {
+		peerStatus := peers.GetStatus(peerArgs[2])
+		peerClock, _ := strconv.Atoi(peerArgs[3])
+
+		// Verifica as condições para atualizar ou adicionar o peer recebido
+		neighbor, exists := knownPeers.Load(peerAddress)
+		if exists {
+			neighborStatus := neighbor.(peers.Peer).Status
+			neighborClock := neighbor.(peers.Peer).Clock
+
+			// Atualiza o status para online e o clock com o que tiver maior valor
+			if peerClock > neighborClock {
+				knownPeers.Store(peerAddress, peers.Peer{Status: peerStatus, Clock: peerClock})
+			} else {
+				knownPeers.Store(peerAddress, peers.Peer{Status: peerStatus, Clock: neighborClock})
+			}
+
+			// Mensagem de atualização apenas se o status for diferente do conhecido
+			if peerStatus != neighborStatus {
+				logger.Info("\tAtualizando peer " + peerAddress + " status " + peerArgs[2])
+			}
+		} else {
+			knownPeers.Store(peerAddress, peers.Peer{Status: peerStatus, Clock: peerClock})
 			logger.Info("\tAdicionando novo peer " + peerAddress + " status " + peerArgs[2])
-			knownPeers.Store(peerAddress, peers.Peer{Status: peers.GetStatus(peerArgs[2]), Clock: 0})
 		}
 	}
 }
