@@ -5,20 +5,14 @@ type PeerStatus bool
 
 // Constantes para os status booleanos
 const (
-	ONLINE  PeerStatus = true
 	OFFLINE PeerStatus = false
+	ONLINE  PeerStatus = true
 )
 
 // Estrutura para armazenar informações do peer conhecido
 type Peer struct {
-	Address string
-	Port    string
-	Status  PeerStatus
-}
-
-// Função para obter o endereço completo a partir do Peer
-func (peer Peer) FullAddress() string {
-	return peer.Address + ":" + peer.Port
+	Status PeerStatus
+	Clock  int
 }
 
 // Função para obter o estado do peer a partir do PeerStatus
