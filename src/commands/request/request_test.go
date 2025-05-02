@@ -24,15 +24,13 @@ func TestSendMessageArgumentsNilOK(t *testing.T) {
 		Type:      message.UNKNOWN,
 		Arguments: nil,
 	}
+	var knownPeers sync.Map
+	knownPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
 
-	err := requestClient.sendMessage(conn, message, "")
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
+	requestClient.sendMessage(conn, message, "127.0.0.1:9001", &knownPeers)
 
-	expected := "localhost 1 UNKNOWN\n"
-	if string(conn.data) != expected {
-		t.Fatalf("Expected %s, got %s", expected, string(conn.data))
+	if string(conn.data) != "localhost 1 UNKNOWN\n" {
+		t.Fatalf("Expected %s, got %s", "localhost 1 UNKNOWN\n", string(conn.data))
 	}
 }
 
@@ -43,25 +41,15 @@ func TestSendMessageConnNil(t *testing.T) {
 		Type:      message.UNKNOWN,
 		Arguments: nil,
 	}
+	var knownPeers sync.Map
+	knownPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
 
-	err := requestClient.sendMessage(nil, message, "")
-	if err.Error() != "connection is nil" {
-		t.Fatalf("Expected error, got %v", err)
-	}
-}
+	requestClient.sendMessage(nil, message, "127.0.0.1:9001", &knownPeers)
 
-func TestSendMessageWriteError(t *testing.T) {
-	conn := &mockConn{}
-	message := message.BaseMessage{
-		Origin:    requestClient.Address + "testingWriteError",
-		Clock:     0,
-		Type:      message.UNKNOWN,
-		Arguments: nil,
-	}
-
-	err := requestClient.sendMessage(conn, message, "")
-	if err.Error() != "write error" {
-		t.Fatalf("Expected error, got %v", err)
+	neighbor, _ := knownPeers.Load("127.0.0.1:9001")
+	neighborStatus := neighbor.(peers.Peer).Status
+	if neighborStatus != peers.OFFLINE {
+		t.Fatalf("Expected peer status to be OFFLINE, got %s", neighborStatus.String())
 	}
 }
 
