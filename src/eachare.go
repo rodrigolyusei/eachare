@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"EACHare/src/clock"
 	"EACHare/src/commands"
 	"EACHare/src/commands/message"
 	"EACHare/src/commands/request"
@@ -187,7 +188,11 @@ func listener() {
 
 // Função para lidar com a conexão recebida
 func receiver(conn net.Conn, knownPeers *sync.Map, waitingCli bool) {
-	receivedMessage := connection.ReceiveMessage(conn, knownPeers, waitingCli)
+	// defer (adia) o fechamento da conexão até o final da função
+	defer conn.Close()
+
+	// Recebe a mensagem da conexão recebida
+	receivedMessage := connection.ReceiveMessage(conn, knownPeers)
 
 	// Se a CLI está esperando por uma entrada e não é um PEERS_LIST, formata
 	if waitingCli {
@@ -195,8 +200,18 @@ func receiver(conn net.Conn, knownPeers *sync.Map, waitingCli bool) {
 	}
 	logger.Info("\tMensagem recebida: \"" + receivedMessage.String() + "\"")
 
+	// Atualiza o relógio local comparando o valor local e recebido
+	clock.UpdateMaxClock(receivedMessage.Clock)
+
+	// Mostra mensagem de atualização apenas se for de peer OFFLINE e não for uma mensagem de BYE
+	neighbor, exists := knownPeers.Load(receivedMessage.Origin)
+	if exists && receivedMessage.Type != message.BYE {
+		logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+	} else {
+		logger.Info("\tAdicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+	}
+
 	// Lida o comando recebido de acordo com o tipo de mensagem
-	neighbor, _ := knownPeers.Load(receivedMessage.Origin)
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
 		response.GetPeersResponse(knownPeers, receivedMessage, conn, myArgs.Address)
@@ -204,7 +219,7 @@ func receiver(conn net.Conn, knownPeers *sync.Map, waitingCli bool) {
 		response.ByeResponse(knownPeers, receivedMessage, neighbor.(peers.Peer).Clock)
 	}
 
-	// Verifica se a CLI está esperando por uma entrada e não é um PEERS_LIST
+	// Verifica se a CLI está esperando por uma entrada
 	if waitingCli {
 		logger.Std("\n> ")
 	}

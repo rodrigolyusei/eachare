@@ -31,8 +31,8 @@ func GetPeersResponse(knownPeers *sync.Map, receivedMessage message.BaseMessage,
 
 	// Cria uma única string da lista inteira e depois cria e envia a mensagem
 	arguments := append([]string{strconv.Itoa(len(myPeers))}, myPeers...)
-	baseMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.PEERS_LIST, Arguments: arguments}
-	connection.SendMessage(conn, baseMessage, receivedMessage.Origin, knownPeers)
+	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.PEERS_LIST, Arguments: arguments}
+	connection.SendMessage(conn, sendMessage, receivedMessage.Origin, knownPeers)
 }
 
 // Função para lidar com o PEERS_LIST recebido
@@ -55,7 +55,6 @@ func PeersListResponse(knownPeers *sync.Map, receivedMessage message.BaseMessage
 		// Verifica as condições para atualizar ou adicionar o peer recebido
 		neighbor, exists := knownPeers.Load(peerAddress)
 		if exists {
-			neighborStatus := neighbor.(peers.Peer).Status
 			neighborClock := neighbor.(peers.Peer).Clock
 
 			// Atualiza o status para online e o clock com o que tiver maior valor
@@ -65,10 +64,7 @@ func PeersListResponse(knownPeers *sync.Map, receivedMessage message.BaseMessage
 				knownPeers.Store(peerAddress, peers.Peer{Status: peerStatus, Clock: neighborClock})
 			}
 
-			// Mensagem de atualização apenas se o status for diferente do conhecido
-			if peerStatus != neighborStatus {
-				logger.Info("\tAtualizando peer " + peerAddress + " status " + peerArgs[2])
-			}
+			logger.Info("\tAtualizando peer " + peerAddress + " status " + peerArgs[2])
 		} else {
 			knownPeers.Store(peerAddress, peers.Peer{Status: peerStatus, Clock: peerClock})
 			logger.Info("\tAdicionando novo peer " + peerAddress + " status " + peerArgs[2])

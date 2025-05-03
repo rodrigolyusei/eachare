@@ -6,26 +6,26 @@ import (
 	"sync"
 	"time"
 
+	"EACHare/src/clock"
 	"EACHare/src/commands/message"
 	"EACHare/src/commands/response"
 	"EACHare/src/connection"
 	"EACHare/src/logger"
+	"EACHare/src/peers"
 )
 
 // Função para mensagem HELLO, avisa o peer que estou online
 func HelloRequest(knownPeers *sync.Map, senderAddress string, receiverAddress string) {
 	// Cria uma mensagem HELLO
-	baseMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.HELLO, Arguments: nil}
+	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.HELLO, Arguments: nil}
 
-	// Tenta conectar e se conectar, define o deadline de 2 segundos
+	// Envia mensagem HELLO para o peer escolhido
 	conn, _ := net.Dial("tcp", receiverAddress)
+	connection.SendMessage(conn, sendMessage, receiverAddress, knownPeers)
 	if conn != nil {
 		defer conn.Close()
 		conn.SetDeadline(time.Now().Add(2 * time.Second))
 	}
-
-	// Envia a mensagem HELLO
-	connection.SendMessage(conn, baseMessage, receiverAddress, knownPeers)
 }
 
 // Função para mensagem GET_PEERS, solicita para os vizinhos sobre quem eles conhecem
@@ -36,21 +36,24 @@ func GetPeersRequest(knownPeers *sync.Map, senderAddress string) {
 		peerCount++
 		return true
 	})
-	baseMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.GET_PEERS, Arguments: nil}
+	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.GET_PEERS, Arguments: nil}
 
-	// Envia mensagem GET_PEERS para cada peer conhecido e adiciona a conexão na lista
+	// Envia mensagem GET_PEERS para cada peer conhecido e espera a resposta
 	knownPeers.Range(func(key, value any) bool {
 		address := key.(string)
 		conn, _ := net.Dial("tcp", address)
+		connection.SendMessage(conn, sendMessage, address, knownPeers)
 		if conn != nil {
 			defer conn.Close()
 			conn.SetDeadline(time.Now().Add(2 * time.Second))
-		}
-		connection.SendMessage(conn, baseMessage, address, knownPeers)
 
-		receivedMessage := connection.ReceiveMessage(conn, knownPeers, false)
-		logger.Info("\tResposta recebida: \"" + receivedMessage.String() + "\"")
-		response.PeersListResponse(knownPeers, receivedMessage)
+			// Recebe a resposta apenas se a conexão for bem-sucedida
+			receivedMessage := connection.ReceiveMessage(conn, knownPeers)
+			logger.Info("\tResposta recebida: \"" + receivedMessage.String() + "\"")
+			clock.UpdateMaxClock(receivedMessage.Clock)
+			logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+			response.PeersListResponse(knownPeers, receivedMessage)
+		}
 		return true
 	})
 }
@@ -59,17 +62,17 @@ func GetPeersRequest(knownPeers *sync.Map, senderAddress string) {
 func ByeRequest(knownPeers *sync.Map, senderAddress string) {
 	// Imprime mensagem de saída e cria a mensagem BYE
 	logger.Info("Saindo...")
-	baseMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.BYE, Arguments: nil}
+	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.BYE, Arguments: nil}
 
 	// Envia mensagem BYE para cada peer conhecido
 	knownPeers.Range(func(key, _ any) bool {
 		address := key.(string)
 		conn, _ := net.Dial("tcp", address)
+		connection.SendMessage(conn, sendMessage, address, knownPeers)
 		if conn != nil {
 			defer conn.Close()
 			conn.SetDeadline(time.Now().Add(2 * time.Second))
 		}
-		connection.SendMessage(conn, baseMessage, address, knownPeers)
 		return true
 	})
 }

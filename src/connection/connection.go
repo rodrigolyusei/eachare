@@ -1,5 +1,6 @@
 package connection
 
+// Pacotes nativos de go e pacotes internos
 import (
 	"bufio"
 	"errors"
@@ -49,10 +50,7 @@ func SendMessage(connection net.Conn, message message.BaseMessage, receiverAddre
 }
 
 // Função para lidar com a conexão recebida
-func ReceiveMessage(conn net.Conn, knownPeers *sync.Map, waitingCli bool) message.BaseMessage {
-	// defer(adia) a função de fechamento da conexão quando as operações terminarem
-	defer conn.Close()
-
+func ReceiveMessage(conn net.Conn, knownPeers *sync.Map) message.BaseMessage {
 	// Lê a mensagem recebida no buffer até encontrar \n e constrói as partes da mensagem
 	msg, err := bufio.NewReader(conn).ReadString('\n')
 	check(err)
@@ -66,13 +64,9 @@ func ReceiveMessage(conn net.Conn, knownPeers *sync.Map, waitingCli bool) messag
 	receivedMessageType := message.GetMessageType(msgParts[2])
 	receivedArguments := msgParts[3:]
 
-	// Atualiza o relógio local comparando o valor local e recebido
-	clock.UpdateMaxClock(receivedClock)
-
 	// Verifica as condições para atualizar ou adicionar o peer recebido
 	neighbor, exists := knownPeers.Load(receivedAddress)
 	if exists {
-		neighborStatus := neighbor.(peers.Peer).Status
 		neighborClock := neighbor.(peers.Peer).Clock
 
 		// Atualiza o status para online e o clock com o que tiver maior valor
@@ -81,14 +75,8 @@ func ReceiveMessage(conn net.Conn, knownPeers *sync.Map, waitingCli bool) messag
 		} else {
 			knownPeers.Store(receivedAddress, peers.Peer{Status: peers.ONLINE, Clock: neighborClock})
 		}
-
-		// Mostra mensagem de atualização apenas se for de peer OFFLINE e não for uma mensagem de BYE
-		if neighborStatus == peers.OFFLINE && message.GetMessageType(msgParts[2]) != message.BYE {
-			logger.Info("\tAtualizando peer " + receivedAddress + " status " + peers.ONLINE.String())
-		}
 	} else {
 		knownPeers.Store(receivedAddress, peers.Peer{Status: peers.ONLINE, Clock: receivedClock})
-		logger.Info("\tAdicionando novo peer " + receivedAddress + " status " + peers.ONLINE.String())
 	}
 
 	// Retorna a mensagem recebida
