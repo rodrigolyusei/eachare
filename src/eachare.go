@@ -14,7 +14,6 @@ import (
 
 	"EACHare/src/clock"
 	"EACHare/src/commands"
-	"EACHare/src/commands/request"
 	"EACHare/src/connection"
 	"EACHare/src/logger"
 	"EACHare/src/message"
@@ -140,7 +139,7 @@ func cliInterface() {
 		case "1":
 			commands.ListPeers(&knownPeers, myAddress)
 		case "2":
-			request.GetPeersRequest(&knownPeers, myAddress)
+			commands.GetPeersRequest(&knownPeers, myAddress)
 		case "3":
 			commands.ListLocalFiles(myShared)
 		case "4":
@@ -150,7 +149,7 @@ func cliInterface() {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			request.ByeRequest(&knownPeers, myAddress)
+			commands.ByeRequest(&knownPeers, myAddress)
 			exit = true
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
