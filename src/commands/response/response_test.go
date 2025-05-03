@@ -24,7 +24,7 @@ func TestPeerListReceive(t *testing.T) {
 	expectedPeers.Store("127.0.0.1:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
 	expectedPeers.Store("127.0.0.1:9003", peers.Peer{Status: peers.ONLINE, Clock: 0})
 
-	PeersListResponse(message, &initialPeers)
+	PeersListResponse(&initialPeers, message)
 
 	expectedPeers.Range(func(key, value any) bool {
 		peerAddress := key.(string)
@@ -54,7 +54,7 @@ func TestPeerListResponseArgumentsNil(t *testing.T) {
 		Arguments: []string{"0"},
 	}
 
-	PeersListResponse(message, &initialPeers)
+	PeersListResponse(&initialPeers, message)
 
 	peersCount := 0
 	initialPeers.Range(func(_, _ any) bool {

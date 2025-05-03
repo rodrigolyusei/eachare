@@ -142,10 +142,7 @@ func cliInterface() {
 		case "1":
 			commands.ListPeers(&knownPeers, myArgs.Address)
 		case "2":
-			connections := request.GetPeersRequest(&knownPeers, myArgs.Address)
-			for _, conn := range connections {
-				go receiver(conn, &knownPeers, waitingCli)
-			}
+			request.GetPeersRequest(&knownPeers, myArgs.Address)
 		case "3":
 			commands.ListLocalFiles(myArgs.Shared)
 		case "4":
