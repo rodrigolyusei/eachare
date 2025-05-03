@@ -26,7 +26,7 @@ func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
 		fmt.Println("Lista de peers: ")
 		fmt.Println("\t[0] voltar para o menu anterior")
 
-		// Lista os peers e cria uma lisat dos endereços para enviar o HELLO
+		// Lista os peers e cria uma lista dos endereços para enviar o HELLO
 		var addrList []string
 		for i, peer := range knownPeers.GetAll() {
 			addrList = append(addrList, peer.Address)

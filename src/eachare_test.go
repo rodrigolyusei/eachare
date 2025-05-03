@@ -5,18 +5,18 @@ import "testing"
 func TestGetArgs(t *testing.T) {
 	getArgs([]string{"eachare", "localhost:8080", "../neighbors/n1.txt", "../shared"})
 
-	if myArgs.address != "localhost:8080" {
+	if myAddress != "localhost:8080" {
 		t.Errorf("Addrs is casting invalid!")
-		t.Errorf("Expected: %s, got: %s", "localhost:8080", myArgs.address)
+		t.Errorf("Expected: %s, got: %s", "localhost:8080", myAddress)
 	}
 
-	if myArgs.neighbors != "../neighbors/n1.txt" {
+	if myNeighbors != "../neighbors/n1.txt" {
 		t.Errorf("Neighbors is casting invalid!")
-		t.Errorf("Expected: %s, got: %s", "../neighbors/n1.txt", myArgs.neighbors)
+		t.Errorf("Expected: %s, got: %s", "../neighbors/n1.txt", myNeighbors)
 	}
 
-	if myArgs.shared != "../shared" {
+	if myShared != "../shared" {
 		t.Errorf("Shared is casting invalid!")
-		t.Errorf("Expected: %s, got: %s", "../shared", myArgs.shared)
+		t.Errorf("Expected: %s, got: %s", "../shared", myShared)
 	}
 }

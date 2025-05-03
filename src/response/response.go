@@ -5,9 +5,9 @@ import (
 	"net"
 	"strconv"
 
-	"EACHare/src/commands/message"
 	"EACHare/src/connection"
 	"EACHare/src/logger"
+	"EACHare/src/message"
 	"EACHare/src/peers"
 )
 

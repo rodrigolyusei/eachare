@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"EACHare/src/clock"
-	"EACHare/src/commands/message"
 	"EACHare/src/logger"
+	"EACHare/src/message"
 	"EACHare/src/peers"
 )
 

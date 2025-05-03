@@ -14,24 +14,19 @@ import (
 
 	"EACHare/src/clock"
 	"EACHare/src/commands"
-	"EACHare/src/commands/message"
 	"EACHare/src/commands/request"
-	"EACHare/src/commands/response"
 	"EACHare/src/connection"
 	"EACHare/src/logger"
+	"EACHare/src/message"
 	"EACHare/src/peers"
+	"EACHare/src/response"
 )
 
-// Struct para os argumentos de entrada, sendo as informações do Peer próprio
-type SelfArgs struct {
-	address   string
-	neighbors string
-	shared    string
-}
-
 // Variáveis globais
+var myAddress string           // Endereço do peer
+var myNeighbors string         // Vizinhos do peer
+var myShared string            // Diretório compartilhado do peer
 var knownPeers peers.SafePeers // Lista dos peers conhecidos seguro para concorrência
-var myArgs SelfArgs            // Armazena os parâmetros de si mesmo
 var waitingCli = false         // Variável para controlar o estado do CLI
 
 // Função para verificar e imprimir mensagem de erro
@@ -65,14 +60,15 @@ func testArgs(args []string) {
 		knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+3), Status: peers.OFFLINE, Clock: 0})
 	}
 
-	// Cria o SelfArgs com os argumentos de teste
-	myArgs = SelfArgs{address: "127.0.0.1:" + strconv.Itoa(port), neighbors: args[2], shared: args[3]}
+	myAddress = "127.0.0.1:" + strconv.Itoa(port)
+	myNeighbors = args[2]
+	myShared = args[3]
 
 	// Imprime os parâmetros de entrada
 	fmt.Println("Modo de teste")
-	fmt.Println("Endereço:", myArgs.address)
-	fmt.Println("Vizinhos:", myArgs.neighbors)
-	fmt.Println("Diretório Compartilhado:", myArgs.shared)
+	fmt.Println("Endereço:", myAddress)
+	fmt.Println("Vizinhos:", myNeighbors)
+	fmt.Println("Diretório Compartilhado:", myShared)
 }
 
 // Função para obter os argumentos de entrada
@@ -88,14 +84,16 @@ func getArgs(args []string) {
 		check(errors.New(str1 + str2))
 	}
 
-	// Se os parâmetros estiverem corretos, retorna a struct preenchida
-	myArgs = SelfArgs{address: args[1], neighbors: args[2], shared: args[3]}
+	// Define os parâmetros se estiverem corretos
+	myAddress = args[1]
+	myNeighbors = args[2]
+	myShared = args[3]
 }
 
 // Função para adicionar vizinhos conhecidos a partir de um arquivo
 func addNeighbors() {
 	// Abre o arquivo de vizinhos
-	file, err := os.Open(myArgs.neighbors)
+	file, err := os.Open(myNeighbors)
 	check(err)
 	defer file.Close()
 
@@ -109,7 +107,7 @@ func addNeighbors() {
 
 // Verifica se o diretório compartilhado existe e está acessível
 func verifySharedDirectory() {
-	_, err := os.ReadDir(myArgs.shared)
+	_, err := os.ReadDir(myShared)
 	check(err)
 }
 
@@ -140,11 +138,11 @@ func cliInterface() {
 		// Executa o comando correspondente
 		switch comm {
 		case "1":
-			commands.ListPeers(&knownPeers, myArgs.address)
+			commands.ListPeers(&knownPeers, myAddress)
 		case "2":
-			request.GetPeersRequest(&knownPeers, myArgs.address)
+			request.GetPeersRequest(&knownPeers, myAddress)
 		case "3":
-			commands.ListLocalFiles(myArgs.shared)
+			commands.ListLocalFiles(myShared)
 		case "4":
 			fmt.Println("Comando ainda não implementado")
 		case "5":
@@ -152,7 +150,7 @@ func cliInterface() {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			request.ByeRequest(&knownPeers, myArgs.address)
+			request.ByeRequest(&knownPeers, myAddress)
 			exit = true
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
@@ -170,7 +168,7 @@ func cliInterface() {
 // Função para iniciar o peer e escutar conexões
 func listener() {
 	// Cria um listener TCP no endereço e porta especificado
-	listener, err := net.Listen("tcp", myArgs.address)
+	listener, err := net.Listen("tcp", myAddress)
 	check(err)
 	defer listener.Close()
 
@@ -213,7 +211,7 @@ func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
 	// Lida o comando recebido de acordo com o tipo de mensagem
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
-		response.GetPeersResponse(knownPeers, receivedMessage, conn, myArgs.address)
+		response.GetPeersResponse(knownPeers, receivedMessage, conn, myAddress)
 	case message.BYE:
 		response.ByeResponse(knownPeers, receivedMessage, neighbor.Clock)
 	}

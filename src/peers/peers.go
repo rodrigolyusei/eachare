@@ -1,5 +1,6 @@
 package peers
 
+// Pacotes nativos de go
 import (
 	"sort"
 	"sync"

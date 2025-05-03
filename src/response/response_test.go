@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"EACHare/src/commands/message"
 	"EACHare/src/logger"
+	"EACHare/src/message"
 	"EACHare/src/peers"
 )
 

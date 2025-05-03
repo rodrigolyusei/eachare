@@ -1,7 +1,7 @@
 package connection
 
 import (
-	"EACHare/src/commands/message"
+	"EACHare/src/message"
 	"EACHare/src/peers"
 	"testing"
 )
