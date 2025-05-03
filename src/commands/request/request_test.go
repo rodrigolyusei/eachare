@@ -5,41 +5,37 @@ import (
 	"EACHare/src/peers"
 	"bytes"
 	"strings"
-	"sync"
 	"testing"
 )
 
 var senderAddress = "localhost"
 
 func TestHelloRequestOffline(t *testing.T) {
-	var initialPeers sync.Map
-	initialPeers.Store("127.0.0.2:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
+	var initialPeers peers.SafePeers
+	initialPeers.Add(peers.Peer{Address: "127.0.0.2:9002", Status: peers.OFFLINE, Clock: 0})
 	receiverAddress := "invalid-address:9999"
 
 	HelloRequest(&initialPeers, senderAddress, receiverAddress)
 }
 
 func TestGetPeersRequest(t *testing.T) {
-	var initialPeers sync.Map
-	initialPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
-	initialPeers.Store("127.0.0.2:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
+	var initialPeers peers.SafePeers
+	initialPeers.Add(peers.Peer{Address: "127.0.0.1:9001", Status: peers.ONLINE, Clock: 0})
+	initialPeers.Add(peers.Peer{Address: "127.0.0.2:9002", Status: peers.OFFLINE, Clock: 0})
 
 	GetPeersRequest(&initialPeers, senderAddress)
 
-	initialPeers.Range(func(key, value any) bool {
-		peerStatus := value.(peers.PeerStatus)
-		if peerStatus {
+	for _, peer := range initialPeers.GetAll() {
+		if peer.Status {
 			t.Errorf("Expected peer status to be false, got true")
 		}
-
-		return true
-	})
+	}
 }
 
 func TestByeRequest(t *testing.T) {
-	var initialPeers sync.Map
-	initialPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
-	initialPeers.Store("127.0.0.2:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
+	var initialPeers peers.SafePeers
+	initialPeers.Add(peers.Peer{Address: "127.0.0.1:9001", Status: peers.ONLINE, Clock: 0})
+	initialPeers.Add(peers.Peer{Address: "127.0.0.2:9002", Status: peers.OFFLINE, Clock: 0})
 
 	var buffer bytes.Buffer
 	logger.SetOutput(&buffer)

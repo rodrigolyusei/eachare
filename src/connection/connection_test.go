@@ -3,7 +3,6 @@ package connection
 import (
 	"EACHare/src/commands/message"
 	"EACHare/src/peers"
-	"sync"
 	"testing"
 )
 
@@ -15,10 +14,10 @@ func TestSendMessageArgumentsNilOK(t *testing.T) {
 		Type:      message.UNKNOWN,
 		Arguments: nil,
 	}
-	var knownPeers sync.Map
-	knownPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
+	var knownPeers peers.SafePeers
+	knownPeers.Add(peers.Peer{Address: "127.0.0.1:9001", Status: peers.ONLINE, Clock: 0})
 
-	SendMessage(conn, message, "127.0.0.1:9001", &knownPeers)
+	SendMessage(&knownPeers, conn, message, "127.0.0.1:9001")
 
 	if string(conn.data) != "localhost 1 UNKNOWN\n" {
 		t.Fatalf("Expected %s, got %s", "localhost 1 UNKNOWN\n", string(conn.data))
@@ -32,14 +31,13 @@ func TestSendMessageConnNil(t *testing.T) {
 		Type:      message.UNKNOWN,
 		Arguments: nil,
 	}
-	var knownPeers sync.Map
-	knownPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
+	var knownPeers peers.SafePeers
+	knownPeers.Add(peers.Peer{Address: "127.0.0.1:9001", Status: peers.ONLINE, Clock: 0})
 
-	SendMessage(nil, message, "127.0.0.1:9001", &knownPeers)
+	SendMessage(&knownPeers, nil, message, "127.0.0.1:9001")
 
-	neighbor, _ := knownPeers.Load("127.0.0.1:9001")
-	neighborStatus := neighbor.(peers.Peer).Status
-	if neighborStatus != peers.OFFLINE {
-		t.Fatalf("Expected peer status to be OFFLINE, got %s", neighborStatus.String())
+	neighbor, _ := knownPeers.Get("127.0.0.1:9001")
+	if neighbor.Status != peers.OFFLINE {
+		t.Fatalf("Expected peer status to be OFFLINE, got %s", neighbor.Status.String())
 	}
 }

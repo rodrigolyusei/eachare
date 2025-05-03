@@ -4,7 +4,6 @@ package response
 import (
 	"net"
 	"strconv"
-	"sync"
 
 	"EACHare/src/commands/message"
 	"EACHare/src/connection"
@@ -13,29 +12,26 @@ import (
 )
 
 // Função para lidar com o GET_PEERS recebido
-func GetPeersResponse(knownPeers *sync.Map, receivedMessage message.BaseMessage, conn net.Conn, senderAddress string) {
+func GetPeersResponse(knownPeers *peers.SafePeers, receivedMessage message.BaseMessage, conn net.Conn, senderAddress string) {
 	// Cria uma lista de strings para os peers conhecidos
 	myPeers := make([]string, 0)
 
 	// Adiciona cada peer conhecido na lista, exceto quem pediu a lista
-	knownPeers.Range(func(key, value any) bool {
-		address := key.(string)
-		neighbor := value.(peers.Peer)
-		if address == receivedMessage.Origin {
-			return true
+	for _, peer := range knownPeers.GetAll() {
+		if peer.Address == receivedMessage.Origin {
+			continue
 		}
-		myPeers = append(myPeers, address+":"+neighbor.Status.String()+":"+strconv.Itoa(neighbor.Clock))
-		return true
-	})
+		myPeers = append(myPeers, peer.Address+":"+peer.Status.String()+":"+strconv.Itoa(peer.Clock))
+	}
 
 	// Cria uma única string da lista inteira e depois cria e envia a mensagem
 	arguments := append([]string{strconv.Itoa(len(myPeers))}, myPeers...)
 	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.PEERS_LIST, Arguments: arguments}
-	connection.SendMessage(conn, sendMessage, receivedMessage.Origin, knownPeers)
+	connection.SendMessage(knownPeers, conn, sendMessage, receivedMessage.Origin)
 }
 
 // Função para lidar com o BYE recebido
-func ByeResponse(knownPeers *sync.Map, receivedMessage message.BaseMessage, neighborClock int) {
-	knownPeers.Store(receivedMessage.Origin, peers.Peer{Status: peers.OFFLINE, Clock: neighborClock})
+func ByeResponse(knownPeers *peers.SafePeers, receivedMessage message.BaseMessage, neighborClock int) {
+	knownPeers.Add(peers.Peer{Address: receivedMessage.Origin, Status: peers.OFFLINE, Clock: neighborClock})
 	logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
 }

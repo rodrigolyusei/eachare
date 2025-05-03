@@ -2,7 +2,6 @@ package response
 
 import (
 	"bytes"
-	"sync"
 	"testing"
 
 	"EACHare/src/commands/message"
@@ -11,10 +10,10 @@ import (
 )
 
 func TestGetPeersResponse(t *testing.T) {
-	var initialPeers sync.Map
-	initialPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
-	initialPeers.Store("127.0.0.1:9002", peers.Peer{Status: peers.ONLINE, Clock: 3})
-	initialPeers.Store("127.0.0.1:9003", peers.Peer{Status: peers.OFFLINE, Clock: 3})
+	var initialPeers peers.SafePeers
+	initialPeers.Add(peers.Peer{Address: "127.0.0.1:9001", Status: peers.ONLINE, Clock: 0})
+	initialPeers.Add(peers.Peer{Address: "127.0.0.1:9002", Status: peers.ONLINE, Clock: 3})
+	initialPeers.Add(peers.Peer{Address: "127.0.0.1:9003", Status: peers.OFFLINE, Clock: 3})
 
 	message := message.BaseMessage{
 		Origin:    "127.0.0.1:9001",
