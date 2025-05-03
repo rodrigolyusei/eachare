@@ -3,12 +3,13 @@ package request
 // Pacotes nativos de go e pacotes internos
 import (
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"EACHare/src/clock"
 	"EACHare/src/commands/message"
-	"EACHare/src/commands/response"
 	"EACHare/src/connection"
 	"EACHare/src/logger"
 	"EACHare/src/peers"
@@ -38,7 +39,7 @@ func GetPeersRequest(knownPeers *sync.Map, senderAddress string) {
 	})
 	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.GET_PEERS, Arguments: nil}
 
-	// Envia mensagem GET_PEERS para cada peer conhecido e espera a resposta
+	// Envia mensagem GET_PEERS para cada peer conhecido
 	knownPeers.Range(func(key, value any) bool {
 		address := key.(string)
 		conn, _ := net.Dial("tcp", address)
@@ -52,7 +53,32 @@ func GetPeersRequest(knownPeers *sync.Map, senderAddress string) {
 			logger.Info("\tResposta recebida: \"" + receivedMessage.String() + "\"")
 			clock.UpdateMaxClock(receivedMessage.Clock)
 			logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
-			response.PeersListResponse(knownPeers, receivedMessage)
+
+			// Para cada peer na mensagem adiciona nos peers conhecidos
+			peersCount, _ := strconv.Atoi(receivedMessage.Arguments[0])
+			for i := range peersCount {
+				// Divide a string do peer em partes e salva cada parte
+				peerArgs := strings.Split(receivedMessage.Arguments[i+1], ":")
+				peerAddress := peerArgs[0] + ":" + peerArgs[1]
+				peerStatus := peers.GetStatus(peerArgs[2])
+				peerClock, _ := strconv.Atoi(peerArgs[3])
+
+				// Verifica as condições para atualizar ou adicionar o peer recebido
+				neighbor, exists := knownPeers.Load(peerAddress)
+				if exists {
+					// Atualiza o status para online e o clock com o que tiver maior valor
+					neighborClock := neighbor.(peers.Peer).Clock
+					if peerClock > neighborClock {
+						knownPeers.Store(peerAddress, peers.Peer{Status: peerStatus, Clock: peerClock})
+					} else {
+						knownPeers.Store(peerAddress, peers.Peer{Status: peerStatus, Clock: neighborClock})
+					}
+					logger.Info("\tAtualizando peer " + peerAddress + " status " + peerArgs[2])
+				} else {
+					knownPeers.Store(peerAddress, peers.Peer{Status: peerStatus, Clock: peerClock})
+					logger.Info("\tAdicionando novo peer " + peerAddress + " status " + peerArgs[2])
+				}
+			}
 		}
 		return true
 	})

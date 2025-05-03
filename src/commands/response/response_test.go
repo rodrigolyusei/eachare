@@ -1,68 +1,40 @@
 package response
 
 import (
+	"bytes"
 	"sync"
 	"testing"
 
 	"EACHare/src/commands/message"
+	"EACHare/src/logger"
 	"EACHare/src/peers"
 )
 
-func TestPeerListReceive(t *testing.T) {
+func TestGetPeersResponse(t *testing.T) {
 	var initialPeers sync.Map
 	initialPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
-	initialPeers.Store("127.0.0.1:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
+	initialPeers.Store("127.0.0.1:9002", peers.Peer{Status: peers.ONLINE, Clock: 3})
+	initialPeers.Store("127.0.0.1:9003", peers.Peer{Status: peers.OFFLINE, Clock: 3})
 
 	message := message.BaseMessage{
+		Origin:    "127.0.0.1:9001",
 		Clock:     1,
-		Type:      message.PEERS_LIST,
-		Arguments: []string{"2", "127.0.0.1:9002:ONLINE:3", "127.0.0.1:9003:ONLINE:0"},
+		Type:      message.GET_PEERS,
+		Arguments: nil,
 	}
 
-	var expectedPeers sync.Map
-	expectedPeers.Store("127.0.0.1:9001", peers.Peer{Status: peers.ONLINE, Clock: 0})
-	expectedPeers.Store("127.0.0.1:9002", peers.Peer{Status: peers.OFFLINE, Clock: 0})
-	expectedPeers.Store("127.0.0.1:9003", peers.Peer{Status: peers.ONLINE, Clock: 0})
+	var buffer bytes.Buffer
+	logger.SetOutput(&buffer)
 
-	PeersListResponse(&initialPeers, message)
+	GetPeersResponse(&initialPeers, message, nil, "127.0.0.1:9002")
 
-	expectedPeers.Range(func(key, value any) bool {
-		peerAddress := key.(string)
-		peerStatus := value.(peers.Peer).Status
-		peerClock := value.(peers.Peer).Clock
+	out := buffer.String()
+	expected := `Saindo...
+    => Atualizando relogio para 1
+    Encaminhando mensagem "localhost 1 BYE" para 127.0.0.1:9001
+    Atualizando peer 127.0.0.1:9001 status OFFLINE`
 
-		peer, exists := initialPeers.Load(peerAddress)
-		if !exists {
-			t.Fatalf("Expected peer %s not found", peerAddress)
-		}
-		if peerStatus != peer.(peers.Peer).Status {
-			t.Fatalf("Expected peer %s status %v, got %v", peerAddress, peerStatus, peer.(peers.Peer).Status)
-		}
-		if peerClock != peer.(peers.Peer).Clock {
-			t.Fatalf("Expected peer %s clock %d, got %d", peerAddress, peerClock, peer.(peers.Peer).Clock)
-		}
-		return true
-	})
-}
-
-func TestPeerListResponseArgumentsNil(t *testing.T) {
-	var initialPeers sync.Map
-
-	message := message.BaseMessage{
-		Clock:     0,
-		Type:      message.PEERS_LIST,
-		Arguments: []string{"0"},
-	}
-
-	PeersListResponse(&initialPeers, message)
-
-	peersCount := 0
-	initialPeers.Range(func(_, _ any) bool {
-		peersCount++
-		return true
-	})
-
-	if peersCount != 0 {
-		t.Fatalf("Expected 0 peers, got %d", peersCount)
+	if expected != out {
+		t.Errorf("\nExpected %d:\n%s\nGot %d:\n%s", len(expected), expected, len(out), out)
 	}
 }
