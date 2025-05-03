@@ -25,9 +25,9 @@ import (
 
 // Struct para os argumentos de entrada, sendo as informações do Peer próprio
 type SelfArgs struct {
-	Address   string
-	Neighbors string
-	Shared    string
+	address   string
+	neighbors string
+	shared    string
 }
 
 // Variáveis globais
@@ -67,13 +67,13 @@ func testArgs(args []string) {
 	}
 
 	// Cria o SelfArgs com os argumentos de teste
-	myArgs = SelfArgs{Address: "127.0.0.1:" + strconv.Itoa(port), Neighbors: args[2], Shared: args[3]}
+	myArgs = SelfArgs{address: "127.0.0.1:" + strconv.Itoa(port), neighbors: args[2], shared: args[3]}
 
 	// Imprime os parâmetros de entrada
 	fmt.Println("Modo de teste")
-	fmt.Println("Endereço:", myArgs.Address)
-	fmt.Println("Vizinhos:", myArgs.Neighbors)
-	fmt.Println("Diretório Compartilhado:", myArgs.Shared)
+	fmt.Println("Endereço:", myArgs.address)
+	fmt.Println("Vizinhos:", myArgs.neighbors)
+	fmt.Println("Diretório Compartilhado:", myArgs.shared)
 }
 
 // Função para obter os argumentos de entrada
@@ -90,13 +90,13 @@ func getArgs(args []string) {
 	}
 
 	// Se os parâmetros estiverem corretos, retorna a struct preenchida
-	myArgs = SelfArgs{Address: args[1], Neighbors: args[2], Shared: args[3]}
+	myArgs = SelfArgs{address: args[1], neighbors: args[2], shared: args[3]}
 }
 
 // Função para adicionar vizinhos conhecidos a partir de um arquivo
 func addNeighbors() {
 	// Abre o arquivo de vizinhos
-	file, err := os.Open(myArgs.Neighbors)
+	file, err := os.Open(myArgs.neighbors)
 	check(err)
 	defer file.Close()
 
@@ -110,7 +110,7 @@ func addNeighbors() {
 
 // Verifica se o diretório compartilhado existe e está acessível
 func verifySharedDirectory() {
-	_, err := os.ReadDir(myArgs.Shared)
+	_, err := os.ReadDir(myArgs.shared)
 	check(err)
 }
 
@@ -141,11 +141,11 @@ func cliInterface() {
 		// Executa o comando correspondente
 		switch comm {
 		case "1":
-			commands.ListPeers(&knownPeers, myArgs.Address)
+			commands.ListPeers(&knownPeers, myArgs.address)
 		case "2":
-			request.GetPeersRequest(&knownPeers, myArgs.Address)
+			request.GetPeersRequest(&knownPeers, myArgs.address)
 		case "3":
-			commands.ListLocalFiles(myArgs.Shared)
+			commands.ListLocalFiles(myArgs.shared)
 		case "4":
 			fmt.Println("Comando ainda não implementado")
 		case "5":
@@ -153,7 +153,7 @@ func cliInterface() {
 		case "6":
 			fmt.Println("Comando ainda não implementado")
 		case "9":
-			request.ByeRequest(&knownPeers, myArgs.Address)
+			request.ByeRequest(&knownPeers, myArgs.address)
 			exit = true
 		default:
 			fmt.Println("Comando inválido, tente novamente.")
@@ -171,7 +171,7 @@ func cliInterface() {
 // Função para iniciar o peer e escutar conexões
 func listener() {
 	// Cria um listener TCP no endereço e porta especificado
-	listener, err := net.Listen("tcp", myArgs.Address)
+	listener, err := net.Listen("tcp", myArgs.address)
 	check(err)
 	defer listener.Close()
 
@@ -214,7 +214,7 @@ func receiver(conn net.Conn, knownPeers *sync.Map, waitingCli bool) {
 	// Lida o comando recebido de acordo com o tipo de mensagem
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
-		response.GetPeersResponse(knownPeers, receivedMessage, conn, myArgs.Address)
+		response.GetPeersResponse(knownPeers, receivedMessage, conn, myArgs.address)
 	case message.BYE:
 		response.ByeResponse(knownPeers, receivedMessage, neighbor.(peers.Peer).Clock)
 	}

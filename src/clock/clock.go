@@ -10,44 +10,44 @@ import (
 
 // Estrutura com o valor do relógio e um mutex para controle de concorrência
 type SafeClock struct {
-	Clock int
-	Mutex sync.Mutex
+	mutex sync.Mutex
+	clock int
 }
 
 // Instância do relógio com mutex
-var safeClock = SafeClock{Clock: 0}
+var safeClock = SafeClock{clock: 0}
 
 // Função para incrementar o relógio e imprimir mensagem de atualização
 func UpdateClock() int {
 	// Bloqueia o mutex para garantir acesso exclusivo ao relógio
-	safeClock.Mutex.Lock()
-	defer safeClock.Mutex.Unlock()
+	safeClock.mutex.Lock()
+	defer safeClock.mutex.Unlock()
 
 	// Incrementa o relógio e imprime a mensagem de atualização
-	safeClock.Clock++
-	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(safeClock.Clock))
-	return safeClock.Clock
+	safeClock.clock++
+	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(safeClock.clock))
+	return safeClock.clock
 }
 
 // Função para atualizar o relógio entre o valor local e o recebido
 func UpdateMaxClock(clockRecebido int) int {
 	// Bloqueia o mutex para garantir acesso exclusivo ao relógio
-	safeClock.Mutex.Lock()
-	defer safeClock.Mutex.Unlock()
+	safeClock.mutex.Lock()
+	defer safeClock.mutex.Unlock()
 
 	// Incrementa o relógio e imprime a mensagem de atualização
-	safeClock.Clock = max(safeClock.Clock, clockRecebido)
-	safeClock.Clock++
-	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(safeClock.Clock))
-	return safeClock.Clock
+	safeClock.clock = max(safeClock.clock, clockRecebido)
+	safeClock.clock++
+	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(safeClock.clock))
+	return safeClock.clock
 }
 
 // Função para obter o valor atual do relógio
 func GetClock() int {
 	// Bloqueia o mutex para garantir acesso exclusivo ao relógio
-	safeClock.Mutex.Lock()
-	defer safeClock.Mutex.Unlock()
+	safeClock.mutex.Lock()
+	defer safeClock.mutex.Unlock()
 
 	// Retorna o valor atual do relógio
-	return safeClock.Clock
+	return safeClock.clock
 }
