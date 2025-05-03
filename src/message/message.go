@@ -15,6 +15,9 @@ const (
 	HELLO
 	GET_PEERS
 	PEERS_LIST
+	LS
+	LS_LIST
+	DL
 	BYE
 )
 
@@ -35,6 +38,12 @@ func (messageType MessageType) String() string {
 		return "GET_PEERS"
 	case PEERS_LIST:
 		return "PEERS_LIST"
+	case LS:
+		return "LS"
+	case LS_LIST:
+		return "LS_LIST"
+	case DL:
+		return "DL"
 	case BYE:
 		return "BYE"
 	default:
@@ -55,6 +64,12 @@ func GetMessageType(s string) MessageType {
 		return GET_PEERS
 	case "PEERS_LIST":
 		return PEERS_LIST
+	case "LS":
+		return LS
+	case "LS_LIST":
+		return LS_LIST
+	case "DL":
+		return DL
 	case "BYE":
 		return BYE
 	default:

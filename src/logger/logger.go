@@ -22,8 +22,8 @@ const (
 
 // Estrutura para armazenar a mensagem de log e seu nível
 type LogMessage struct {
-	Level   LogLevel
-	Message string
+	level   LogLevel
+	message string
 }
 
 // Variáveis globais para o logger
@@ -79,7 +79,7 @@ func SetOutput(w io.Writer) {
 func ConsumeLogQueue(ch chan LogMessage) {
 	for {
 		logMessage := <-ch
-		outputBuf.Write([]byte(logMessage.Message))
+		outputBuf.Write([]byte(logMessage.message))
 	}
 }
 
@@ -99,7 +99,7 @@ func Std(str string) {
 	defer stdBufMutex.Unlock()
 
 	if logLevel >= ZERO {
-		logQueue <- LogMessage{Level: INFO, Message: str}
+		logQueue <- LogMessage{level: ZERO, message: str}
 		infoBuf.Reset()
 	}
 }
@@ -110,7 +110,7 @@ func Info(str string) {
 
 	infoLogger.Output(2, str)
 	if logLevel >= INFO {
-		logQueue <- LogMessage{Level: INFO, Message: infoBuf.String()}
+		logQueue <- LogMessage{level: INFO, message: infoBuf.String()}
 		infoBuf.Reset()
 	}
 }
@@ -121,7 +121,7 @@ func Debug(str string) {
 
 	debugLogger.Output(2, str)
 	if logLevel >= DEBUG {
-		logQueue <- LogMessage{Level: DEBUG, Message: infoBuf.String()}
+		logQueue <- LogMessage{level: DEBUG, message: infoBuf.String()}
 		debugBuf.Reset()
 	}
 }
@@ -132,7 +132,7 @@ func Error(str string) {
 
 	errorLogger.Output(2, str)
 	if logLevel >= ERROR {
-		logQueue <- LogMessage{Level: ERROR, Message: infoBuf.String()}
+		logQueue <- LogMessage{level: ERROR, message: infoBuf.String()}
 		errorBuf.Reset()
 	}
 }
