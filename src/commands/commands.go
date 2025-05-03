@@ -19,7 +19,7 @@ func check(err error) {
 }
 
 // Função para listar os peers conhecidos e enviar HELLO para o peer escolhido
-func ListPeers(knownPeers *sync.Map, requestClient request.IRequest) {
+func ListPeers(knownPeers *sync.Map, senderAddress string) {
 	// Declara variável para o comando e inicia o loop do menu
 	var comm string
 	for {
@@ -56,7 +56,7 @@ func ListPeers(knownPeers *sync.Map, requestClient request.IRequest) {
 		if number == 0 {
 			break
 		} else if number > 0 && number <= len(addrList) {
-			requestClient.HelloRequest(addrList[number-1], knownPeers)
+			request.HelloRequest(knownPeers, senderAddress, addrList[number-1])
 			break
 		} else {
 			fmt.Println("Opção inválida, tente novamente.")

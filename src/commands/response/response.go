@@ -8,18 +8,35 @@ import (
 	"sync"
 
 	"EACHare/src/commands/message"
-	"EACHare/src/commands/request"
+	"EACHare/src/connection"
 	"EACHare/src/logger"
 	"EACHare/src/peers"
 )
 
 // Função para lidar com o GET_PEERS recebido
-func GetPeersResponse(conn net.Conn, receivedMessage message.BaseMessage, knownPeers *sync.Map, requestClient request.IRequest) {
-	requestClient.PeersListRequest(conn, receivedMessage, knownPeers)
+func GetPeersResponse(knownPeers *sync.Map, receivedMessage message.BaseMessage, conn net.Conn, senderAddress string) {
+	// Cria uma lista de strings para os peers conhecidos
+	myPeers := make([]string, 0)
+
+	// Adiciona cada peer conhecido na lista, exceto quem pediu a lista
+	knownPeers.Range(func(key, value any) bool {
+		address := key.(string)
+		neighbor := value.(peers.Peer)
+		if address == receivedMessage.Origin {
+			return true
+		}
+		myPeers = append(myPeers, address+":"+neighbor.Status.String()+":"+strconv.Itoa(neighbor.Clock))
+		return true
+	})
+
+	// Cria uma única string da lista inteira e depois cria e envia a mensagem
+	arguments := append([]string{strconv.Itoa(len(myPeers))}, myPeers...)
+	baseMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.PEERS_LIST, Arguments: arguments}
+	connection.SendMessage(conn, baseMessage, receivedMessage.Origin, knownPeers)
 }
 
 // Função para lidar com o PEERS_LIST recebido
-func PeersListResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map) {
+func PeersListResponse(knownPeers *sync.Map, receivedMessage message.BaseMessage) {
 	// Conta quantos peers foram recebidos na mensagem
 	peersCount, err := strconv.Atoi(receivedMessage.Arguments[0])
 	if err != nil {
@@ -60,7 +77,7 @@ func PeersListResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map
 }
 
 // Função para lidar com o BYE recebido
-func ByeResponse(receivedMessage message.BaseMessage, knownPeers *sync.Map, neighborClock int) {
+func ByeResponse(knownPeers *sync.Map, receivedMessage message.BaseMessage, neighborClock int) {
 	knownPeers.Store(receivedMessage.Origin, peers.Peer{Status: peers.OFFLINE, Clock: neighborClock})
 	logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
 }
