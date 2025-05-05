@@ -61,7 +61,7 @@ func ReceiveMessage(knownPeers *peers.SafePeers, conn net.Conn) message.BaseMess
 	receivedClock, err := strconv.Atoi(msgParts[1])
 	check(err)
 	receivedMessageType := message.GetMessageType(msgParts[2])
-	var receivedArguments []string = nil
+	var receivedArguments []string
 	if len(msgParts) > 3 {
 		receivedArguments = msgParts[3:]
 	}

@@ -25,11 +25,11 @@ func check(err error) {
 
 // Função para listar os peers conhecidos e enviar HELLO para o peer escolhido
 func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
-	// Declara variável para o comando e inicia o loop do menu
+	// Declara variável para o comando e inicia o loop do menu de peers
 	var comm string
 	for {
 		// Imprime o menu de opções
-		logger.Std("Lista de peers: \n")
+		logger.Std("Lista de peers:\n")
 		logger.Std("\t[0] voltar para o menu anterior\n")
 
 		// Lista os peers e cria uma lista dos endereços para enviar o HELLO
@@ -94,10 +94,10 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 			// Itera sobre os peers no argumento da mensagem recebida
 			for _, peer := range receivedMessage.Arguments[1:] {
 				// Salva as partes do peer
-				peerArgs := strings.Split(peer, ":")
-				peerAddress := peerArgs[0] + ":" + peerArgs[1]
-				peerStatus := peers.GetStatus(peerArgs[2])
-				peerClock, _ := strconv.Atoi(peerArgs[3])
+				peerParts := strings.Split(peer, ":")
+				peerAddress := peerParts[0] + ":" + peerParts[1]
+				peerStatus := peers.GetStatus(peerParts[2])
+				peerClock, _ := strconv.Atoi(peerParts[3])
 
 				// Verifica as condições para atualizar ou adicionar o peer recebido
 				neighbor, exists := knownPeers.Get(peerAddress)
@@ -108,10 +108,10 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 					} else {
 						knownPeers.Add(peers.Peer{Address: peerAddress, Status: neighbor.Status, Clock: neighbor.Clock})
 					}
-					logger.Info("Atualizando peer " + peerAddress + " status " + peerArgs[2])
+					logger.Info("Atualizando peer " + peerAddress + " status " + peerParts[2])
 				} else {
 					knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
-					logger.Info("Adicionando novo peer " + peerAddress + " status " + peerArgs[2])
+					logger.Info("Adicionando novo peer " + peerAddress + " status " + peerParts[2])
 				}
 			}
 		}
@@ -125,6 +125,102 @@ func ListLocalFiles(sharedPath string) {
 	check(err)
 	for _, entry := range entries {
 		logger.Std("\t" + entry.Name() + "\n")
+	}
+}
+
+// Função para mensagem LS, solicita para os vizinhos onlines os seus arquivos
+func LsRequest(knownPeers *peers.SafePeers, senderAddress string) {
+	// Cria a estrutura da mensagem LS
+	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.LS, Arguments: nil}
+
+	// Envia mensagem LS para cada peer conhecido online
+	var noPeers bool = true
+	var files []string
+	for _, peer := range knownPeers.GetAll() {
+		if peer.Status == peers.OFFLINE {
+			continue
+		}
+		conn, _ := net.Dial("tcp", peer.Address)
+		connection.SendMessage(knownPeers, conn, sendMessage, peer.Address)
+		if conn != nil {
+			defer conn.Close()
+			conn.SetDeadline(time.Now().Add(2 * time.Second))
+
+			// Recebe a resposta apenas se a conexão for bem-sucedida
+			receivedMessage := connection.ReceiveMessage(knownPeers, conn)
+			logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
+			clock.UpdateMaxClock(receivedMessage.Clock)
+			logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+			noPeers = false
+
+			// Itera sobre os arquivos no argumento da mensagem recebida
+			for _, file := range receivedMessage.Arguments[1:] {
+				file = file + ":" + receivedMessage.Origin
+				files = append(files, file)
+			}
+		}
+	}
+
+	// Chama a função para download apenas se havia arquivos disponíveis na busca
+	if noPeers {
+		logger.Std("Não havia nenhum peer online na busca\n")
+	} else if files == nil {
+		logger.Std("\nNão havia nenhum arquivo disponível na busca\n")
+	} else {
+		DlRequest(knownPeers, senderAddress, files)
+	}
+}
+
+// Função para mensagem DL, escolhe um arquivo dentre os buscados para baixar
+func DlRequest(knownPeers *peers.SafePeers, senderAddress string, files []string) {
+	// Declara variável para o comando e inicia o loop do menu de arquivos
+	var comm string
+	for {
+		// Imprime o menu de opções
+		logger.Std("\nArquivos encontrados na rede:\n")
+		logger.Std("\t     Nome\t| Tamanho\t| Peer\n")
+		logger.Std("\t[ 0] <Cancelar>\t|\t|\n")
+
+		// Lista os peers e cria uma lista dos endereços para enviar o HELLO
+		for i, file := range files {
+			fileParts := strings.Split(file, ":")
+			fileName := fileParts[0]
+			fileSize := fileParts[1]
+			fileSource := fileParts[2] + ":" + fileParts[3]
+			logger.Std("\t[ " + strconv.Itoa(i+1) + "] " + fileName + "\t| " + fileSize + "\t| " + fileSource + "\n")
+		}
+
+		// Lê a entrada do usuário
+		logger.Std("\nDigite o numero do arquivo para fazer o download:\n")
+		logger.Std("> ")
+		fmt.Scanln(&comm)
+		logger.Std("\n")
+
+		// Converte a entrada para inteiro
+		number, err := strconv.Atoi(comm)
+		if err != nil {
+			logger.Std("Opção inválida, tente novamente.\n\n")
+			continue
+		}
+
+		// Solicitação de download para o arquivo escolhido
+		if number == 0 {
+			break
+		} else if number > 0 && number <= len(files) {
+			// // Cria uma mensagem DL
+			// sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.DL, Arguments: nil}
+
+			// // Envia mensagem DL para o peer escolhido
+			// conn, _ := net.Dial("tcp", addrList[number-1])
+			// connection.SendMessage(knownPeers, conn, sendMessage, addrList[number-1])
+			// if conn != nil {
+			// 	defer conn.Close()
+			// 	conn.SetDeadline(time.Now().Add(2 * time.Second))
+			// }
+			break
+		} else {
+			logger.Std("Opção inválida, tente novamente.\n\n")
+		}
 	}
 }
 

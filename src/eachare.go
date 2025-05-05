@@ -143,7 +143,7 @@ func cliInterface() {
 		case "3":
 			commands.ListLocalFiles(myShared)
 		case "4":
-			logger.Std("Comando ainda não implementado.\n")
+			commands.LsRequest(&knownPeers, myAddress)
 		case "5":
 			logger.Std("Comando ainda não implementado.\n")
 		case "6":
@@ -210,9 +210,11 @@ func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
 	// Lida o comando recebido de acordo com o tipo de mensagem
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
-		response.GetPeersResponse(knownPeers, receivedMessage, conn, myAddress)
+		response.GetPeersResponse(knownPeers, receivedMessage.Origin, myAddress, conn)
+	case message.LS:
+		response.LsResponse(knownPeers, receivedMessage.Origin, myAddress, myShared, conn)
 	case message.BYE:
-		response.ByeResponse(knownPeers, receivedMessage, neighbor.Clock)
+		response.ByeResponse(knownPeers, receivedMessage.Origin, neighbor.Clock)
 	}
 
 	// Verifica se a CLI está esperando por uma entrada
