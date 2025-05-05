@@ -29,25 +29,25 @@ func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
 	var comm string
 	for {
 		// Imprime o menu de opções
-		fmt.Println("Lista de peers: ")
-		fmt.Println("\t[0] voltar para o menu anterior")
+		logger.Std("Lista de peers: \n")
+		logger.Std("\t[0] voltar para o menu anterior\n")
 
 		// Lista os peers e cria uma lista dos endereços para enviar o HELLO
 		var addrList []string
 		for i, peer := range knownPeers.GetAll() {
 			addrList = append(addrList, peer.Address)
-			fmt.Println("\t[" + strconv.Itoa(i+1) + "] " + peer.Address + " " + peer.Status.String())
+			logger.Std("\t[" + strconv.Itoa(i+1) + "] " + peer.Address + " " + peer.Status.String() + "\n")
 		}
 
 		// Lê a entrada do usuário
-		fmt.Print("> ")
+		logger.Std("> ")
 		fmt.Scanln(&comm)
-		fmt.Println()
+		logger.Std("\n")
 
 		// Converte a entrada para inteiro
 		number, err := strconv.Atoi(comm)
 		if err != nil {
-			fmt.Println("Comando inválido, tente novamente.")
+			logger.Std("Opção inválida, tente novamente.\n\n")
 			continue
 		}
 
@@ -67,7 +67,7 @@ func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
 			}
 			break
 		} else {
-			fmt.Println("Opção inválida, tente novamente.")
+			logger.Std("Opção inválida, tente novamente.\n\n")
 		}
 	}
 }
@@ -87,9 +87,9 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 
 			// Recebe a resposta apenas se a conexão for bem-sucedida
 			receivedMessage := connection.ReceiveMessage(knownPeers, conn)
-			logger.Info("\tResposta recebida: \"" + receivedMessage.String() + "\"")
+			logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
 			clock.UpdateMaxClock(receivedMessage.Clock)
-			logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+			logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 
 			// Para cada peer na mensagem adiciona nos peers conhecidos
 			peersCount, _ := strconv.Atoi(receivedMessage.Arguments[0])
@@ -109,10 +109,10 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 					} else {
 						knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: neighbor.Clock})
 					}
-					logger.Info("\tAtualizando peer " + peerAddress + " status " + peerArgs[2])
+					logger.Info("Atualizando peer " + peerAddress + " status " + peerArgs[2])
 				} else {
 					knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
-					logger.Info("\tAdicionando novo peer " + peerAddress + " status " + peerArgs[2])
+					logger.Info("Adicionando novo peer " + peerAddress + " status " + peerArgs[2])
 				}
 			}
 		}
@@ -125,14 +125,14 @@ func ListLocalFiles(sharedPath string) {
 	entries, err := os.ReadDir(sharedPath)
 	check(err)
 	for _, entry := range entries {
-		fmt.Println("\t" + entry.Name())
+		logger.Std("\t" + entry.Name() + "\n")
 	}
 }
 
 // Função para mensagem BYE, avisando os peers sobre a saída
 func ByeRequest(knownPeers *peers.SafePeers, senderAddress string) {
 	// Imprime mensagem de saída e cria a mensagem BYE
-	logger.Info("Saindo...")
+	logger.Std("Saindo...\n")
 	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.BYE, Arguments: nil}
 
 	// Envia mensagem BYE para cada peer conhecido

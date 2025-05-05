@@ -33,5 +33,5 @@ func GetPeersResponse(knownPeers *peers.SafePeers, receivedMessage message.BaseM
 // Função para lidar com o BYE recebido
 func ByeResponse(knownPeers *peers.SafePeers, receivedMessage message.BaseMessage, neighborClock int) {
 	knownPeers.Add(peers.Peer{Address: receivedMessage.Origin, Status: peers.OFFLINE, Clock: neighborClock})
-	logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
+	logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.OFFLINE.String())
 }

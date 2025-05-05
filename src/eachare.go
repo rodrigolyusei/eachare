@@ -64,10 +64,10 @@ func testArgs(args []string) {
 	myShared = args[3]
 
 	// Imprime os parâmetros de entrada
-	fmt.Println("Modo de teste")
-	fmt.Println("Endereço:", myAddress)
-	fmt.Println("Vizinhos:", myNeighbors)
-	fmt.Println("Diretório Compartilhado:", myShared)
+	logger.Std("Modo de teste\n")
+	logger.Std("Endereço: " + myAddress + "\n")
+	logger.Std("Vizinhos: " + myNeighbors + "\n")
+	logger.Std("Diretório Compartilhado: " + myShared + "\n")
 }
 
 // Função para obter os argumentos de entrada
@@ -100,7 +100,7 @@ func addNeighbors() {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		knownPeers.Add(peers.Peer{Address: scanner.Text(), Status: peers.OFFLINE, Clock: 0})
-		logger.Info("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String())
+		logger.Std("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String() + "\n")
 	}
 }
 
@@ -120,19 +120,19 @@ func cliInterface() {
 		waitingCli = true
 
 		// Imprime o menu de opções
-		fmt.Println("\nEscolha um comando:")
-		fmt.Println("\t[1] Listar peers")
-		fmt.Println("\t[2] Obter peers")
-		fmt.Println("\t[3] Listar arquivos locais")
-		fmt.Println("\t[4] Buscar arquivos")
-		fmt.Println("\t[5] Exibir estatisticas")
-		fmt.Println("\t[6] Alterar tamanho de chunk")
-		fmt.Println("\t[9] Sair")
+		logger.Std("\nEscolha um comando:\n")
+		logger.Std("\t[1] Listar peers\n")
+		logger.Std("\t[2] Obter peers\n")
+		logger.Std("\t[3] Listar arquivos locais\n")
+		logger.Std("\t[4] Buscar arquivos\n")
+		logger.Std("\t[5] Exibir estatisticas\n")
+		logger.Std("\t[6] Alterar tamanho de chunk\n")
+		logger.Std("\t[9] Sair\n")
 
 		// Lê a entrada do usuário
-		fmt.Print("> ")
+		logger.Std("> ")
 		fmt.Scanln(&comm)
-		fmt.Println()
+		logger.Std("\n")
 
 		// Executa o comando correspondente
 		switch comm {
@@ -143,16 +143,16 @@ func cliInterface() {
 		case "3":
 			commands.ListLocalFiles(myShared)
 		case "4":
-			fmt.Println("Comando ainda não implementado")
+			logger.Std("Comando ainda não implementado.\n")
 		case "5":
-			fmt.Println("Comando ainda não implementado")
+			logger.Std("Comando ainda não implementado.\n")
 		case "6":
-			fmt.Println("Comando ainda não implementado")
+			logger.Std("Comando ainda não implementado.\n")
 		case "9":
 			commands.ByeRequest(&knownPeers, myAddress)
 			exit = true
 		default:
-			fmt.Println("Comando inválido, tente novamente.")
+			logger.Std("Comando inválido, tente novamente.\n")
 		}
 
 		// Indica que a CLI não está mais esperando por uma entrada
@@ -194,17 +194,17 @@ func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
 	if waitingCli {
 		logger.Std("\n\n")
 	}
-	logger.Info("\tMensagem recebida: \"" + receivedMessage.String() + "\"")
+	logger.Info("Mensagem recebida: \"" + receivedMessage.String() + "\"")
 
 	// Atualiza o relógio local comparando o valor local e recebido
 	clock.UpdateMaxClock(receivedMessage.Clock)
 
 	// Mostra mensagem de atualização apenas se for de peer OFFLINE e não for uma mensagem de BYE
 	neighbor, exists := knownPeers.Get(receivedMessage.Origin)
-	if exists && receivedMessage.Type != message.BYE {
-		logger.Info("\tAtualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
-	} else {
-		logger.Info("\tAdicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+	if !exists {
+		logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+	} else if receivedMessage.Type != message.BYE {
+		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 	}
 
 	// Lida o comando recebido de acordo com o tipo de mensagem

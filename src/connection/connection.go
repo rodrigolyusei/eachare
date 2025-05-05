@@ -25,7 +25,7 @@ func check(err error) {
 func SendMessage(knownPeers *peers.SafePeers, conn net.Conn, message message.BaseMessage, receiverAddress string) {
 	// Atualiza o clock e mostra o encaminhamento
 	message.Clock = clock.UpdateClock()
-	logger.Info("\tEncaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
+	logger.Info("Encaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
 
 	// Tenta enviar a mensagem e verificar se há um erro
 	var err error
@@ -40,10 +40,10 @@ func SendMessage(knownPeers *peers.SafePeers, conn net.Conn, message message.Bas
 	neighborStatus := neighbor.Status
 	neighborClock := neighbor.Clock
 	if err != nil && neighborStatus == peers.ONLINE {
-		logger.Info("\tAtualizando peer " + receiverAddress + " status " + peers.OFFLINE.String())
+		logger.Info("Atualizando peer " + receiverAddress + " status " + peers.OFFLINE.String())
 		knownPeers.Add(peers.Peer{Address: receiverAddress, Status: peers.OFFLINE, Clock: neighborClock})
 	} else if err == nil && neighborStatus == peers.OFFLINE {
-		logger.Info("\tAtualizando peer " + receiverAddress + " status " + peers.ONLINE.String())
+		logger.Info("Atualizando peer " + receiverAddress + " status " + peers.ONLINE.String())
 		knownPeers.Add(peers.Peer{Address: receiverAddress, Status: peers.ONLINE, Clock: neighborClock})
 	}
 }
