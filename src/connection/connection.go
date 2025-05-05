@@ -66,15 +66,10 @@ func ReceiveMessage(knownPeers *peers.SafePeers, conn net.Conn) message.BaseMess
 		receivedArguments = msgParts[3:]
 	}
 
-	// Verifica as condições para atualizar ou adicionar o peer recebido
+	// Adiciona ou atualiza (apenas se for informação mais recente) o peer recebido
 	neighbor, exists := knownPeers.Get(receivedAddress)
-	if exists {
-		// Atualiza o status para online e o clock com o valor mais recente
-		if receivedClock > neighbor.Clock {
-			knownPeers.Add(peers.Peer{Address: receivedAddress, Status: peers.ONLINE, Clock: receivedClock})
-		} else {
-			knownPeers.Add(peers.Peer{Address: receivedAddress, Status: peers.ONLINE, Clock: neighbor.Clock})
-		}
+	if exists && neighbor.Clock > receivedClock {
+		knownPeers.Add(peers.Peer{Address: receivedAddress, Status: peers.ONLINE, Clock: neighbor.Clock})
 	} else {
 		knownPeers.Add(peers.Peer{Address: receivedAddress, Status: peers.ONLINE, Clock: receivedClock})
 	}

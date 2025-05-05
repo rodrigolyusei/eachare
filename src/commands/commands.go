@@ -102,11 +102,9 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 				// Verifica as condições para atualizar ou adicionar o peer recebido
 				neighbor, exists := knownPeers.Get(peerAddress)
 				if exists {
-					// Atualiza o status e o clock baseado na informação mais recente
+					// Atualiza o status e o clock apenas se for mais recente
 					if peerClock > neighbor.Clock {
 						knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
-					} else {
-						knownPeers.Add(peers.Peer{Address: peerAddress, Status: neighbor.Status, Clock: neighbor.Clock})
 					}
 					logger.Info("Atualizando peer " + peerAddress + " status " + peerParts[2])
 				} else {
