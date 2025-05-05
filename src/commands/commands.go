@@ -2,6 +2,7 @@ package commands
 
 // Pacotes nativos de go e pacotes internos
 import (
+	"encoding/base64"
 	"fmt"
 	"net"
 	"os"
@@ -174,18 +175,32 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, files []string
 	// Declara variável para o comando e inicia o loop do menu de arquivos
 	var comm string
 	for {
+		// Encontra o nome e o tamanho com maior quantidade de caracteres
+		maxName := len("<Cancelar>")
+		maxSize := len("Tamanho")
+		for _, file := range files {
+			fileParts := strings.SplitN(file, ":", 3)
+			if len(fileParts[0]) > maxName {
+				maxName = len(fileParts[0])
+			}
+			if len(fileParts[1]) > maxSize {
+				maxSize = len(fileParts[1])
+			}
+		}
+
+		// Formata o cabeçalho e a linha do menu
+		header := fmt.Sprintf("\t     %%-%ds | %%-%ds | %%s\n", maxName, maxSize)
+		row := fmt.Sprintf("\t[%%2d] %%-%ds | %%-%ds | %%s\n", maxName, maxSize)
+
 		// Imprime o menu de opções
 		logger.Std("\nArquivos encontrados na rede:\n")
-		logger.Std("\t     Nome\t| Tamanho\t| Peer\n")
-		logger.Std("\t[ 0] <Cancelar>\t|\t|\n")
+		logger.Std(fmt.Sprintf(header, "Nome", "Tamanho", "Peer"))
+		logger.Std(fmt.Sprintf(row, 0, "<Cancelar>", "", ""))
 
 		// Lista os peers e cria uma lista dos endereços para enviar o HELLO
 		for i, file := range files {
-			fileParts := strings.Split(file, ":")
-			fileName := fileParts[0]
-			fileSize := fileParts[1]
-			fileSource := fileParts[2] + ":" + fileParts[3]
-			logger.Std("\t[ " + strconv.Itoa(i+1) + "] " + fileName + "\t| " + fileSize + "\t| " + fileSource + "\n")
+			fileParts := strings.SplitN(file, ":", 3)
+			logger.Std(fmt.Sprintf(row, i+1, fileParts[0], fileParts[1], fileParts[2]))
 		}
 
 		// Lê a entrada do usuário
@@ -205,16 +220,33 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, files []string
 		if number == 0 {
 			break
 		} else if number > 0 && number <= len(files) {
-			// // Cria uma mensagem DL
-			// sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.DL, Arguments: nil}
+			// Cria uma mensagem DL
+			chosenParts := strings.SplitN(files[number-1], ":", 3)
+			argument := []string{chosenParts[0], "0", "0"}
+			sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.DL, Arguments: argument}
 
-			// // Envia mensagem DL para o peer escolhido
-			// conn, _ := net.Dial("tcp", addrList[number-1])
-			// connection.SendMessage(knownPeers, conn, sendMessage, addrList[number-1])
-			// if conn != nil {
-			// 	defer conn.Close()
-			// 	conn.SetDeadline(time.Now().Add(2 * time.Second))
-			// }
+			logger.Std("arquivo escolhido " + chosenParts[0] + "\n")
+
+			// Envia mensagem DL para o peer escolhido
+			conn, _ := net.Dial("tcp", chosenParts[2])
+			connection.SendMessage(knownPeers, conn, sendMessage, chosenParts[2])
+			if conn != nil {
+				defer conn.Close()
+				conn.SetDeadline(time.Now().Add(2 * time.Second))
+
+				// Recebe a resposta apenas se a conexão for bem-sucedida
+				receivedMessage := connection.ReceiveMessage(knownPeers, conn)
+				logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
+				clock.UpdateMaxClock(receivedMessage.Clock)
+				logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+
+				// Decodifica o conteúdo do arquivo recebido
+				decoded, err := base64.StdEncoding.DecodeString(receivedMessage.Arguments[3])
+				check(err)
+				fmt.Println(string(decoded))
+
+				logger.Std("\nDownload do arquivo " + receivedMessage.Arguments[0] + " finalizado.\n")
+			}
 			break
 		} else {
 			logger.Std("Opção inválida, tente novamente.\n\n")

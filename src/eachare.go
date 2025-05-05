@@ -213,6 +213,8 @@ func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
 		response.GetPeersResponse(knownPeers, receivedMessage.Origin, myAddress, conn)
 	case message.LS:
 		response.LsResponse(knownPeers, receivedMessage.Origin, myAddress, myShared, conn)
+	case message.DL:
+		response.DlResponse(knownPeers, receivedMessage, myAddress, myShared, conn)
 	case message.BYE:
 		response.ByeResponse(knownPeers, receivedMessage.Origin, neighbor.Clock)
 	}
