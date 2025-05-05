@@ -61,7 +61,10 @@ func ReceiveMessage(knownPeers *peers.SafePeers, conn net.Conn) message.BaseMess
 	receivedClock, err := strconv.Atoi(msgParts[1])
 	check(err)
 	receivedMessageType := message.GetMessageType(msgParts[2])
-	receivedArguments := msgParts[3:]
+	var receivedArguments []string = nil
+	if len(msgParts) > 3 {
+		receivedArguments = msgParts[3:]
+	}
 
 	// Verifica as condições para atualizar ou adicionar o peer recebido
 	neighbor, exists := knownPeers.Get(receivedAddress)
