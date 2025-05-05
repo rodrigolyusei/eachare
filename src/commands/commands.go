@@ -91,11 +91,10 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 			clock.UpdateMaxClock(receivedMessage.Clock)
 			logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 
-			// Para cada peer na mensagem adiciona nos peers conhecidos
-			peersCount, _ := strconv.Atoi(receivedMessage.Arguments[0])
-			for i := range peersCount {
-				// Divide a string do peer em partes e salva cada parte
-				peerArgs := strings.Split(receivedMessage.Arguments[i+1], ":")
+			// Itera sobre os peers no argumento da mensagem recebida
+			for _, peer := range receivedMessage.Arguments[1:] {
+				// Salva as partes do peer
+				peerArgs := strings.Split(peer, ":")
 				peerAddress := peerArgs[0] + ":" + peerArgs[1]
 				peerStatus := peers.GetStatus(peerArgs[2])
 				peerClock, _ := strconv.Atoi(peerArgs[3])
@@ -103,11 +102,11 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 				// Verifica as condições para atualizar ou adicionar o peer recebido
 				neighbor, exists := knownPeers.Get(peerAddress)
 				if exists {
-					// Atualiza o status para online e o clock com o que tiver maior valor
+					// Atualiza o status e o clock baseado na informação mais recente
 					if peerClock > neighbor.Clock {
 						knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
 					} else {
-						knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: neighbor.Clock})
+						knownPeers.Add(peers.Peer{Address: peerAddress, Status: neighbor.Status, Clock: neighbor.Clock})
 					}
 					logger.Info("Atualizando peer " + peerAddress + " status " + peerArgs[2])
 				} else {
