@@ -37,14 +37,13 @@ func SendMessage(knownPeers *peers.SafePeers, conn net.Conn, message message.Bas
 
 	// Atualiza o peer e imprime mensagem apenas quando o status muda
 	neighbor, _ := knownPeers.Get(receiverAddress)
-	neighborStatus := neighbor.Status
 	neighborClock := neighbor.Clock
-	if err != nil && neighborStatus == peers.ONLINE {
-		logger.Info("Atualizando peer " + receiverAddress + " status " + peers.OFFLINE.String())
-		knownPeers.Add(peers.Peer{Address: receiverAddress, Status: peers.OFFLINE, Clock: neighborClock})
-	} else if err == nil && neighborStatus == peers.OFFLINE {
+	if err == nil {
 		logger.Info("Atualizando peer " + receiverAddress + " status " + peers.ONLINE.String())
 		knownPeers.Add(peers.Peer{Address: receiverAddress, Status: peers.ONLINE, Clock: neighborClock})
+	} else {
+		logger.Info("Atualizando peer " + receiverAddress + " status " + peers.OFFLINE.String())
+		knownPeers.Add(peers.Peer{Address: receiverAddress, Status: peers.OFFLINE, Clock: neighborClock})
 	}
 }
 
