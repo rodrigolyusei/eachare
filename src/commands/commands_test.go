@@ -1,12 +1,13 @@
 package commands
 
 import (
-	"EACHare/src/logger"
-	"EACHare/src/peers"
 	"bytes"
 	"os"
 	"strings"
 	"testing"
+
+	"EACHare/src/logger"
+	"EACHare/src/peers"
 )
 
 var senderAddress = "localhost"
