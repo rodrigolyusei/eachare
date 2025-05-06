@@ -106,8 +106,9 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 					// Atualiza o status e o clock apenas se for mais recente
 					if peerClock > neighbor.Clock {
 						knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
+						logger.Info("Atualizando peer " + peerAddress + " status " + peerParts[2])
 					}
-					logger.Info("Atualizando peer " + peerAddress + " status " + peerParts[2])
+					logger.Info("Atualizando peer " + peerAddress + " status " + neighbor.Status.String())
 				} else {
 					knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
 					logger.Info("Adicionando novo peer " + peerAddress + " status " + peerParts[2])
@@ -136,7 +137,7 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 	var noPeers bool = true
 	var files []string
 	for _, peer := range knownPeers.GetAll() {
-		if peer.Status == peers.OFFLINE {
+		if !peer.Status {
 			continue
 		}
 		conn, _ := net.Dial("tcp", peer.Address)
@@ -267,6 +268,9 @@ func ByeRequest(knownPeers *peers.SafePeers, senderAddress string) {
 
 	// Envia mensagem BYE para cada peer conhecido
 	for _, peer := range knownPeers.GetAll() {
+		if !peer.Status {
+			continue
+		}
 		conn, _ := net.Dial("tcp", peer.Address)
 		connection.SendMessage(knownPeers, conn, sendMessage, peer.Address)
 		if conn != nil {
