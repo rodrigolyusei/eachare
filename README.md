@@ -18,8 +18,10 @@ Todos os comandos abaixos, inclusive a de teste, deve ser feito estando no diret
 É possível compilar e executar com as duas linhas a seguir:
 ```cmd
 go build ./eachare.go
-./eachare.exe 127.0.0.1:9001 ../data/neighbor1.txt ../data/shared1/
+./eachare 127.0.0.1:9001 ../data/neighbor1.txt ../data/shared1/
 ```
+>**Aviso**: o executável gerado pelo Go varia de SO para SO, no caso do Linux gera um arquivo sem extensão, enquanto no windows gera um `.exe`.
+
 Caso a versão do go não esteja compatível, crie um novo go.mod e tente novamente:
 ```cmd
 rm go.mod
