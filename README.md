@@ -15,7 +15,7 @@ go version
 ## Compilação e Execução do Programa
 É possível compilar e executar, após estar no diretório /src, com as duas linhas a seguir:
 ```cmd
-go build eachare.go
+go build ./eachare.go
 ./eachare.go 127.0.0.1:9000 ../neighbors/n1.txt ../shared
 ```
 Caso a versão do go não esteja compatível, crie um novo go.mod:
@@ -26,10 +26,9 @@ go mod init EACHare/src
 Depois tente novamente com build.
 
 ## Testes
-Para gerar o cover dos unit tests,
+Para gerar o cover dos unit tests, mostrando a taxa de funções tratadas:
 
 ```cmd
-cd src
 go test ./... -coverprofile profile.out
 go tool cover -func profile.out
 ```
