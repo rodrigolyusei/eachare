@@ -193,7 +193,7 @@ func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
 	// Recebe a mensagem da conexão recebida
 	receivedMessage := connection.ReceiveMessage(knownPeers, conn)
 
-	// Se a CLI está esperando por uma entrada e não é um PEERS_LIST, formata
+	// Se a CLI está esperando por uma entrada formata
 	if waitingCli {
 		logger.Std("\n\n")
 	}
@@ -202,7 +202,7 @@ func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
 	// Atualiza o relógio local comparando o valor local e recebido
 	clock.UpdateMaxClock(receivedMessage.Clock)
 
-	// Mostra mensagem de atualização apenas se for de peer OFFLINE e não for uma mensagem de BYE
+	// Mostra mensagem de adição se não tinha o peer e atualização se tinha não é BYE
 	neighbor, exists := knownPeers.Get(receivedMessage.Origin)
 	if !exists {
 		logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())

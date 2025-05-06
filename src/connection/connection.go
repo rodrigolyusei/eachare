@@ -35,7 +35,7 @@ func SendMessage(knownPeers *peers.SafePeers, conn net.Conn, message message.Bas
 		_, err = conn.Write([]byte(message.String() + "\n"))
 	}
 
-	// Atualiza o peer e imprime mensagem apenas quando o status muda
+	// Atualiza o peer e mostra atualização
 	neighbor, _ := knownPeers.Get(receiverAddress)
 	neighborClock := neighbor.Clock
 	if err == nil {
