@@ -128,7 +128,7 @@ func ListLocalFiles(sharedPath string) {
 }
 
 // Função para mensagem LS, solicita para os vizinhos onlines os seus arquivos
-func LsRequest(knownPeers *peers.SafePeers, senderAddress string) {
+func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string) {
 	// Cria a estrutura da mensagem LS
 	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.LS, Arguments: nil}
 
@@ -166,12 +166,12 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string) {
 	} else if files == nil {
 		logger.Std("\nNão havia nenhum arquivo disponível na busca\n")
 	} else {
-		DlRequest(knownPeers, senderAddress, files)
+		DlRequest(knownPeers, senderAddress, sharedPath, files)
 	}
 }
 
 // Função para mensagem DL, escolhe um arquivo dentre os buscados para baixar
-func DlRequest(knownPeers *peers.SafePeers, senderAddress string, files []string) {
+func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, files []string) {
 	// Declara variável para o comando e inicia o loop do menu de arquivos
 	var comm string
 	for {
@@ -243,8 +243,13 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, files []string
 				// Decodifica o conteúdo do arquivo recebido
 				decoded, err := base64.StdEncoding.DecodeString(receivedMessage.Arguments[3])
 				check(err)
-				fmt.Println(string(decoded))
 
+				// Cria/substitui o arquivo e escreve o conteúdo decodificado
+				file, err := os.Create(sharedPath + receivedMessage.Arguments[0])
+				check(err)
+				defer file.Close()
+				_, err = file.Write(decoded)
+				check(err)
 				logger.Std("\nDownload do arquivo " + receivedMessage.Arguments[0] + " finalizado.\n")
 			}
 			break

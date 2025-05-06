@@ -108,6 +108,9 @@ func addNeighbors() {
 func verifySharedDirectory() {
 	_, err := os.ReadDir(myShared)
 	check(err)
+	if myShared[len(myShared)-1:] != "/" {
+		myShared += "/"
+	}
 }
 
 // Função para a CLI/menu de interação com o usuário
@@ -143,7 +146,7 @@ func cliInterface() {
 		case "3":
 			commands.ListLocalFiles(myShared)
 		case "4":
-			commands.LsRequest(&knownPeers, myAddress)
+			commands.LsRequest(&knownPeers, myAddress, myShared)
 		case "5":
 			logger.Std("Comando ainda não implementado.\n")
 		case "6":
