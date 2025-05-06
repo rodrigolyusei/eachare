@@ -25,7 +25,7 @@ func check(err error) {
 func SendMessage(knownPeers *peers.SafePeers, conn net.Conn, message message.BaseMessage, receiverAddress string) {
 	// Atualiza o clock e mostra o encaminhamento
 	message.Clock = clock.UpdateClock()
-	logger.Info("\tEncaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
+	logger.Info("Encaminhando mensagem \"" + message.String() + "\" para " + receiverAddress)
 
 	// Tenta enviar a mensagem e verificar se há um erro
 	var err error
@@ -40,10 +40,10 @@ func SendMessage(knownPeers *peers.SafePeers, conn net.Conn, message message.Bas
 	neighborStatus := neighbor.Status
 	neighborClock := neighbor.Clock
 	if err != nil && neighborStatus == peers.ONLINE {
-		logger.Info("\tAtualizando peer " + receiverAddress + " status " + peers.OFFLINE.String())
+		logger.Info("Atualizando peer " + receiverAddress + " status " + peers.OFFLINE.String())
 		knownPeers.Add(peers.Peer{Address: receiverAddress, Status: peers.OFFLINE, Clock: neighborClock})
 	} else if err == nil && neighborStatus == peers.OFFLINE {
-		logger.Info("\tAtualizando peer " + receiverAddress + " status " + peers.ONLINE.String())
+		logger.Info("Atualizando peer " + receiverAddress + " status " + peers.ONLINE.String())
 		knownPeers.Add(peers.Peer{Address: receiverAddress, Status: peers.ONLINE, Clock: neighborClock})
 	}
 }
@@ -61,19 +61,15 @@ func ReceiveMessage(knownPeers *peers.SafePeers, conn net.Conn) message.BaseMess
 	receivedClock, err := strconv.Atoi(msgParts[1])
 	check(err)
 	receivedMessageType := message.GetMessageType(msgParts[2])
-	receivedArguments := msgParts[3:]
+	var receivedArguments []string
+	if len(msgParts) > 3 {
+		receivedArguments = msgParts[3:]
+	}
 
-	// Verifica as condições para atualizar ou adicionar o peer recebido
+	// Adiciona ou atualiza (apenas se for informação mais recente) o peer recebido
 	neighbor, exists := knownPeers.Get(receivedAddress)
-	if exists {
-		neighborClock := neighbor.Clock
-
-		// Atualiza o status para online e o clock com o que tiver maior valor
-		if receivedClock > neighborClock {
-			knownPeers.Add(peers.Peer{Address: receivedAddress, Status: peers.ONLINE, Clock: receivedClock})
-		} else {
-			knownPeers.Add(peers.Peer{Address: receivedAddress, Status: peers.ONLINE, Clock: neighborClock})
-		}
+	if exists && neighbor.Clock > receivedClock {
+		knownPeers.Add(peers.Peer{Address: receivedAddress, Status: peers.ONLINE, Clock: neighbor.Clock})
 	} else {
 		knownPeers.Add(peers.Peer{Address: receivedAddress, Status: peers.ONLINE, Clock: receivedClock})
 	}

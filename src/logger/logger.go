@@ -88,7 +88,7 @@ func init() {
 	SetOutput(os.Stdout)
 	go ConsumeLogQueue(logQueue)
 
-	infoLogger = log.New(&infoBuf, "", 0)
+	infoLogger = log.New(&infoBuf, "\t", 0)
 	debugLogger = log.New(&debugBuf, "[DEBUG] ", log.Lmicroseconds|log.Lmsgprefix)
 	errorLogger = log.New(&errorBuf, "[ERROR] ", log.Lmicroseconds|log.Lmsgprefix|log.Lshortfile)
 }

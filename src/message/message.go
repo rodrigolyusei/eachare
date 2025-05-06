@@ -18,6 +18,7 @@ const (
 	LS
 	LS_LIST
 	DL
+	FILE
 	BYE
 )
 
@@ -44,6 +45,8 @@ func (messageType MessageType) String() string {
 		return "LS_LIST"
 	case DL:
 		return "DL"
+	case FILE:
+		return "FILE"
 	case BYE:
 		return "BYE"
 	default:
@@ -70,6 +73,8 @@ func GetMessageType(s string) MessageType {
 		return LS_LIST
 	case "DL":
 		return DL
+	case "FILE":
+		return FILE
 	case "BYE":
 		return BYE
 	default:

@@ -25,7 +25,7 @@ func UpdateClock() int {
 
 	// Incrementa o relógio e imprime a mensagem de atualização
 	safeClock.clock++
-	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(safeClock.clock))
+	logger.Info("=> Atualizando relogio para " + strconv.Itoa(safeClock.clock))
 	return safeClock.clock
 }
 
@@ -38,7 +38,7 @@ func UpdateMaxClock(clockRecebido int) int {
 	// Incrementa o relógio e imprime a mensagem de atualização
 	safeClock.clock = max(safeClock.clock, clockRecebido)
 	safeClock.clock++
-	logger.Info("\t=> Atualizando relogio para " + strconv.Itoa(safeClock.clock))
+	logger.Info("=> Atualizando relogio para " + strconv.Itoa(safeClock.clock))
 	return safeClock.clock
 }
 
