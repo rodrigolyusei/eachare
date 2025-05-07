@@ -37,18 +37,17 @@ func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
 		var addrList []string
 		for i, peer := range knownPeers.GetAll() {
 			addrList = append(addrList, peer.Address)
-			logger.Std("\t[" + strconv.Itoa(i+1) + "] " + peer.Address + " " + peer.Status.String() + "\n")
+			logger.Std("\t[" + strconv.Itoa(i+1) + "] " + peer.Address + " " + peer.Status.String() + " (clock: " + strconv.Itoa(peer.Clock) + ")" + "\n")
 		}
 
 		// Lê a entrada do usuário
 		logger.Std("> ")
 		fmt.Scanln(&comm)
-		logger.Std("\n")
 
 		// Converte a entrada para inteiro
 		number, err := strconv.Atoi(comm)
 		if err != nil {
-			logger.Std("Opção inválida, tente novamente.\n\n")
+			logger.Std("\nOpção inválida, tente novamente.\n\n")
 			continue
 		}
 
@@ -56,10 +55,11 @@ func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
 		if number == 0 {
 			break
 		} else if number > 0 && number <= len(addrList) {
-			// Cria uma mensagem HELLO
-			sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.HELLO, Arguments: nil}
+			// Imprime uma quebra de linha
+			logger.Std("\n")
 
-			// Envia mensagem HELLO para o peer escolhido
+			// Cria e envia a mensagem HELLO para o peer escolhido
+			sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.HELLO, Arguments: nil}
 			conn, _ := net.Dial("tcp", addrList[number-1])
 			connection.SendMessage(knownPeers, conn, sendMessage, addrList[number-1])
 			if conn != nil {
@@ -68,7 +68,7 @@ func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
 			}
 			break
 		} else {
-			logger.Std("Opção inválida, tente novamente.\n\n")
+			logger.Std("\nOpção inválida, tente novamente.\n\n")
 		}
 	}
 }
@@ -107,8 +107,9 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 					if peerClock > neighbor.Clock {
 						knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
 						logger.Info("Atualizando peer " + peerAddress + " status " + peerParts[2])
+					} else {
+						logger.Info("Atualizando peer " + peerAddress + " status " + neighbor.Status.String())
 					}
-					logger.Info("Atualizando peer " + peerAddress + " status " + neighbor.Status.String())
 				} else {
 					knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
 					logger.Info("Adicionando novo peer " + peerAddress + " status " + peerParts[2])
