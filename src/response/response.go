@@ -68,7 +68,7 @@ func DlResponse(knownPeers *peers.SafePeers, receivedMessage message.BaseMessage
 
 	// Cria o argumento sobre o arquivo e envia a mensagem
 	arguments := []string{receivedMessage.Arguments[0], "0", "0", encoded}
-	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.LS_LIST, Arguments: arguments}
+	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.FILE, Arguments: arguments}
 	connection.SendMessage(knownPeers, conn, sendMessage, receivedMessage.Origin)
 }
 

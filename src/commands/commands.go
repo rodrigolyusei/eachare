@@ -105,7 +105,7 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 				neighbor, exists := knownPeers.Get(peerAddress)
 				if exists {
 					// Atualiza o status e o clock apenas se for mais recente
-					if peerClock > neighbor.Clock {
+					if peerClock >= neighbor.Clock {
 						knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
 						logger.Info("Atualizando peer " + peerAddress + " status " + peerParts[2])
 					} else {
@@ -210,12 +210,11 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 		logger.Std("\nDigite o numero do arquivo para fazer o download:\n")
 		logger.Std("> ")
 		fmt.Scanln(&comm)
-		logger.Std("\n")
 
 		// Converte a entrada para inteiro
 		number, err := strconv.Atoi(comm)
 		if err != nil {
-			logger.Std("Opção inválida, tente novamente.\n\n")
+			logger.Std("\nOpção inválida, tente novamente.\n")
 			continue
 		}
 
@@ -228,7 +227,7 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 			argument := []string{chosenParts[0], "0", "0"}
 			sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.DL, Arguments: argument}
 
-			logger.Std("arquivo escolhido " + chosenParts[0] + "\n")
+			logger.Std("\nArquivo escolhido " + chosenParts[0] + "\n")
 
 			// Envia mensagem DL para o peer escolhido
 			conn, _ := net.Dial("tcp", chosenParts[2])
@@ -257,7 +256,7 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 			}
 			break
 		} else {
-			logger.Std("Opção inválida, tente novamente.\n\n")
+			logger.Std("\nOpção inválida, tente novamente.\n")
 		}
 	}
 }
