@@ -27,9 +27,13 @@ Caso a versão do go não esteja compatível, crie um novo go.mod e tente novame
 rm go.mod
 go mod init EACHare/src
 ```
-Se quiser executar sem compilar, pode ser feito com `go run`:
+No caso de executar sem compilar, pode ser feito com `go run`.\
+Usamos os seguintes comandos para criar peers e avaliar o comportamento:
 ```cmd
 go run ./eachare.go 127.0.0.1:9001 ../data/neighbor1.txt ../data/shared1/
+go run ./eachare.go 127.0.0.1:9002 ../data/neighbor2.txt ../data/shared2/
+go run ./eachare.go 127.0.0.1:9003 ../data/neighbor3.txt ../data/shared3/
+go run ./eachare.go 127.0.0.1:9004 ../data/neighbor4.txt ../data/shared4/
 ```
 
 ## Testes

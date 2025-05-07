@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"sync"
 
-	"EACHare/src/logger"
+	"eachare/src/logger"
 )
 
 // Estrutura com o valor do relógio e um mutex para controle de concorrência

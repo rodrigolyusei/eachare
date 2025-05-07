@@ -1,9 +1,10 @@
 package connection
 
 import (
-	"EACHare/src/message"
-	"EACHare/src/peers"
 	"testing"
+
+	"eachare/src/message"
+	"eachare/src/peers"
 )
 
 func TestSendMessageArgumentsNilOK(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"EACHare/src/logger"
-	"EACHare/src/peers"
+	"eachare/src/logger"
+	"eachare/src/peers"
 )
 
 func TestGetPeersResponse(t *testing.T) {

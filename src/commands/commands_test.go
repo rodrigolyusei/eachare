@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"EACHare/src/logger"
-	"EACHare/src/peers"
+	"eachare/src/logger"
+	"eachare/src/peers"
 )
 
 var senderAddress = "localhost"

@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
-	"EACHare/src/clock"
-	"EACHare/src/commands"
-	"EACHare/src/connection"
-	"EACHare/src/logger"
-	"EACHare/src/message"
-	"EACHare/src/peers"
-	"EACHare/src/response"
+	"eachare/src/clock"
+	"eachare/src/commands"
+	"eachare/src/connection"
+	"eachare/src/logger"
+	"eachare/src/message"
+	"eachare/src/peers"
+	"eachare/src/response"
 )
 
 // Variáveis globais

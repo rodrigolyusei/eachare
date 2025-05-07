@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"EACHare/src/clock"
-	"EACHare/src/connection"
-	"EACHare/src/logger"
-	"EACHare/src/message"
-	"EACHare/src/peers"
+	"eachare/src/clock"
+	"eachare/src/connection"
+	"eachare/src/logger"
+	"eachare/src/message"
+	"eachare/src/peers"
 )
 
 // Função para verificar e imprimir mensagem de erro

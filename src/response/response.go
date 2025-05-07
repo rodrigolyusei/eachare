@@ -7,10 +7,10 @@ import (
 	"os"
 	"strconv"
 
-	"EACHare/src/connection"
-	"EACHare/src/logger"
-	"EACHare/src/message"
-	"EACHare/src/peers"
+	"eachare/src/connection"
+	"eachare/src/logger"
+	"eachare/src/message"
+	"eachare/src/peers"
 )
 
 // Função para verificar e imprimir mensagem de erro
