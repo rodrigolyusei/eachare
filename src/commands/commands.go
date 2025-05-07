@@ -109,7 +109,7 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 						knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
 						logger.Info("Atualizando peer " + peerAddress + " status " + peerParts[2])
 					} else {
-						logger.Info("Atualizando peer " + peerAddress + " status " + neighbor.Status.String())
+						logger.Info("Continuando peer " + peerAddress + " status " + neighbor.Status.String() + " (informação desatualizada recebida)")
 					}
 				} else {
 					knownPeers.Add(peers.Peer{Address: peerAddress, Status: peerStatus, Clock: peerClock})
