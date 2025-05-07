@@ -25,7 +25,7 @@ go build ./eachare.go
 Caso a versão do go não esteja compatível, crie um novo go.mod e tente novamente:
 ```cmd
 rm go.mod
-go mod init EACHare/src
+go mod init eachare/src
 ```
 No caso de executar sem compilar, pode ser feito com `go run`.\
 Usamos os seguintes comandos para criar peers e avaliar o comportamento:
