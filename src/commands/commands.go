@@ -63,6 +63,7 @@ func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
 			conn, _ := net.Dial("tcp", addrList[number-1])
 			connection.SendMessage(knownPeers, conn, sendMessage, addrList[number-1])
 			if conn != nil {
+				logger.Info("Atualizando peer " + addrList[number-1] + " status " + peers.ONLINE.String())
 				defer conn.Close()
 				conn.SetDeadline(time.Now().Add(2 * time.Second))
 			}
