@@ -36,7 +36,9 @@ func UpdateMaxClock(clockRecebido int) int {
 	defer safeClock.mutex.Unlock()
 
 	// Incrementa o relógio e imprime a mensagem de atualização
-	safeClock.clock = max(safeClock.clock, clockRecebido)
+	if safeClock.clock < clockRecebido {
+		safeClock.clock = clockRecebido
+	}
 	safeClock.clock++
 	logger.Info("=> Atualizando relogio para " + strconv.Itoa(safeClock.clock))
 	return safeClock.clock
