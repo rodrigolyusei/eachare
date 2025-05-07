@@ -3,7 +3,8 @@ Exercício programa de Sistemas Distribuídos desenvolvido em Go, implementando 
 
 ## Instalação do Go
 Para o Windows, é possível instalar pelo arquivo `.zip` ou `.msi` no site oficial.\
-Para o Ubuntu, é possível instalar pelo arquivo `.tar.gz` no site oficial ou usando o gerenciador de pacotes apt:
+Para o Ubuntu, é possível instalar pelo arquivo `.tar.gz` no site oficial ou pelo gerenciador de pacotes apt.\
+Uma ressalva com apt é que ele instala uma versão mais antiga 1.18 (no caso do nosso programa não tem problema):
 ```cmd
 sudo apt update
 sudo apt install golang-go
