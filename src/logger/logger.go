@@ -26,24 +26,43 @@ type LogMessage struct {
 	message string
 }
 
+type Logger struct {
+	buffer *bytes.Buffer
+	logger *log.Logger
+	mutex  sync.Mutex
+	Level  LogLevel
+}
+
+func (l *Logger) Lock() {
+	l.mutex.Lock()
+}
+
+func (l *Logger) Unlock() {
+	l.mutex.Unlock()
+}
+
+func (l *Logger) Write(message string) LogMessage {
+	stdLogger.Lock()
+	defer stdLogger.Unlock()
+
+	l.logger.Print(message)
+
+	bufMessage := l.buffer.String()
+	l.buffer.Reset()
+
+	return LogMessage{level: l.Level, message: bufMessage}
+}
+
 // Variáveis globais para o logger
 var logQueue = make(chan LogMessage, 100)
 var logLevel = INFO
 var outputBuf io.Writer
 
 // Variáveis para o buffer da mensagem e logger para escrita
-var infoBuf bytes.Buffer
-var infoLogger *log.Logger
-var debugBuf bytes.Buffer
-var debugLogger *log.Logger
-var errorBuf bytes.Buffer
-var errorLogger *log.Logger
-
-// Mutex para proteger o buffer de saída
-var stdBufMutex sync.Mutex
-var infoBufMutex sync.Mutex
-var debugBufMutex sync.Mutex
-var errorBufMutex sync.Mutex
+var stdLogger Logger
+var infoLogger Logger
+var debugLogger Logger
+var errorLogger Logger
 
 // Setter para o logLevel
 func SetLogLevel(level LogLevel) {
@@ -88,51 +107,53 @@ func init() {
 	SetOutput(os.Stdout)
 	go ConsumeLogQueue(logQueue)
 
-	infoLogger = log.New(&infoBuf, "\t", 0)
-	debugLogger = log.New(&debugBuf, "[DEBUG] ", log.Lmicroseconds|log.Lmsgprefix)
-	errorLogger = log.New(&errorBuf, "[ERROR] ", log.Lmicroseconds|log.Lmsgprefix|log.Lshortfile)
+	var stdBuf, infoBuf, debugBuf, errorBuf bytes.Buffer
+
+	stdLogger = Logger{
+		buffer: &stdBuf,
+		logger: log.New(&stdBuf, "", 0),
+	}
+
+	infoLogger = Logger{
+		buffer: &infoBuf,
+		logger: log.New(&infoBuf, "\t", 0),
+		Level:  INFO,
+	}
+
+	debugLogger = Logger{
+		buffer: &debugBuf,
+		logger: log.New(&debugBuf, "[DEBUG] ", log.Lmicroseconds|log.Lmsgprefix),
+		Level:  DEBUG,
+	}
+
+	errorLogger = Logger{
+		buffer: &errorBuf,
+		logger: log.New(&errorBuf, "[ERROR] ", log.Lmicroseconds|log.Lmsgprefix|log.Lshortfile),
+		Level:  ERROR,
+	}
 }
 
 // Funções para logar mensagens de diferentes níveis
 func Std(str string) {
-	stdBufMutex.Lock()
-	defer stdBufMutex.Unlock()
-
 	if logLevel >= ZERO {
-		logQueue <- LogMessage{level: ZERO, message: str}
-		infoBuf.Reset()
+		logQueue <- stdLogger.Write(str)
 	}
 }
 
 func Info(str string) {
-	infoBufMutex.Lock()
-	defer infoBufMutex.Unlock()
-
-	infoLogger.Output(2, str)
 	if logLevel >= INFO {
-		logQueue <- LogMessage{level: INFO, message: infoBuf.String()}
-		infoBuf.Reset()
+		logQueue <- infoLogger.Write(str)
 	}
 }
 
 func Debug(str string) {
-	debugBufMutex.Lock()
-	defer debugBufMutex.Unlock()
-
-	debugLogger.Output(2, str)
 	if logLevel >= DEBUG {
-		logQueue <- LogMessage{level: DEBUG, message: infoBuf.String()}
-		debugBuf.Reset()
+		logQueue <- debugLogger.Write(str)
 	}
 }
 
 func Error(str string) {
-	errorBufMutex.Lock()
-	defer errorBufMutex.Unlock()
-
-	errorLogger.Output(2, str)
 	if logLevel >= ERROR {
-		logQueue <- LogMessage{level: ERROR, message: infoBuf.String()}
-		errorBuf.Reset()
+		logQueue <- errorLogger.Write(str)
 	}
 }
