@@ -27,6 +27,7 @@ var myNeighbors string         // Vizinhos do peer
 var myShared string            // Diretório compartilhado do peer
 var knownPeers peers.SafePeers // Lista dos peers conhecidos seguro para concorrência
 var waitingCli = false         // Variável para controlar o estado do CLI
+var tamanhoChunk = 256         // Tamanho do chunk
 
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
@@ -150,7 +151,9 @@ func cliInterface() {
 		case "5":
 			logger.Std("Comando ainda não implementado.\n")
 		case "6":
-			logger.Std("Comando ainda não implementado.\n")
+			tamanhoChunk = commands.ChangeChunk()
+			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(tamanhoChunk))
+			//logger.Std("Comando ainda não implementado.\n")
 		case "9":
 			commands.ByeRequest(&knownPeers, myAddress)
 			exit = true

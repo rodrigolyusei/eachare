@@ -280,3 +280,17 @@ func ByeRequest(knownPeers *peers.SafePeers, senderAddress string) {
 		}
 	}
 }
+
+func ChangeChunk() int {
+	var chunk string
+	logger.Std("\nDigite novo tamanho de chunk:\n>")
+	for {
+		fmt.Scanln(&chunk)
+		number, err := strconv.Atoi(chunk)
+
+		if err == nil && number > 0 {
+			return number
+		}
+		logger.Std("\nValor inválido. Precisa ser um inteiro maior que 0.\n>")
+	}
+}
