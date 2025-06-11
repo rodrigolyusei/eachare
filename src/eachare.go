@@ -21,13 +21,25 @@ import (
 	"eachare/src/response"
 )
 
-// Variáveis globais
-var myAddress string           // Endereço do peer
-var myNeighbors string         // Vizinhos do peer
-var myShared string            // Diretório compartilhado do peer
-var knownPeers peers.SafePeers // Lista dos peers conhecidos seguro para concorrência
-var waitingCli = false         // Variável para controlar o estado do CLI
-var tamanhoChunk = 256         // Tamanho do chunk
+type Client struct {
+	address    string           // Endereço do peer
+	neighbors  string           // Vizinhos do peer
+	shared     string           // Diretório compartilhado do peer
+	knownPeers *peers.SafePeers // Lista dos peers conhecidos seguro para concorrência
+	waitingCli bool             // Variável para controlar o estado do CLI
+	chunkSize  int              // Tamanho do chunk
+}
+
+func NewClient(address string, neighbors string, shared string) Client {
+	return Client{
+		address:    address,
+		neighbors:  neighbors,
+		shared:     shared,
+		knownPeers: &peers.SafePeers{},
+		waitingCli: false,
+		chunkSize:  256,
+	}
+}
 
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
@@ -37,9 +49,8 @@ func check(err error) {
 }
 
 // Função para modo de teste, simulando a execução do programa com argumentos específicos
-func testArgs(args []string) {
+func testArgs(args []string) *Client {
 	port := 10000
-
 	// Vai criando um listener TCP em portas diferentes até encontrar uma porta livre
 	for {
 		port++
@@ -51,28 +62,27 @@ func testArgs(args []string) {
 		break
 	}
 
+	client := NewClient("127.0.0.1:"+strconv.Itoa(port), args[2], args[3])
+
 	// Cria um mapa de peers dinamicamente
 	if port%2 == 0 {
-		knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
-		knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+2), Status: peers.OFFLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+2), Status: peers.OFFLINE, Clock: 0})
 	} else {
-		knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
-		knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+3), Status: peers.OFFLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+3), Status: peers.OFFLINE, Clock: 0})
 	}
-
-	myAddress = "127.0.0.1:" + strconv.Itoa(port)
-	myNeighbors = args[2]
-	myShared = args[3]
 
 	// Imprime os parâmetros de entrada
 	logger.Std("Modo de teste\n")
-	logger.Std("Endereço: " + myAddress + "\n")
-	logger.Std("Vizinhos: " + myNeighbors + "\n")
-	logger.Std("Diretório Compartilhado: " + myShared + "\n")
+	logger.Std("Endereço: " + client.address + "\n")
+	logger.Std("Vizinhos: " + client.neighbors + "\n")
+	logger.Std("Diretório Compartilhado: " + client.shared + "\n")
+	return &client
 }
 
 // Função para obter os argumentos de entrada
-func getArgs(args []string) {
+func getArgs(args []string) *Client {
 	// Verifica a quantidade de parâmetros e o formato do endereço
 	if len(args) != 4 {
 		str1 := "\nParâmetros de entrada inválidos, por favor, siga o formato abaixo:"
@@ -85,43 +95,42 @@ func getArgs(args []string) {
 	}
 
 	// Define os parâmetros se estiverem corretos
-	myAddress = args[1]
-	myNeighbors = args[2]
-	myShared = args[3]
+	client := NewClient(args[1], args[2], args[3])
+	return &client
 }
 
 // Função para adicionar vizinhos conhecidos a partir de um arquivo
-func addNeighbors() {
+func (c *Client) addNeighbors() {
 	// Abre o arquivo de vizinhos
-	file, err := os.Open(myNeighbors)
+	file, err := os.Open(c.neighbors)
 	check(err)
 	defer file.Close()
 
 	// Lê o arquivo linha por linha
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		knownPeers.Add(peers.Peer{Address: scanner.Text(), Status: peers.OFFLINE, Clock: 0})
+		c.knownPeers.Add(peers.Peer{Address: scanner.Text(), Status: peers.OFFLINE, Clock: 0})
 		logger.Std("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String() + "\n")
 	}
 }
 
 // Verifica se o diretório compartilhado existe e está acessível
-func verifySharedDirectory() {
-	_, err := os.ReadDir(myShared)
+func (c *Client) verifySharedDirectory() {
+	_, err := os.ReadDir(c.shared)
 	check(err)
-	if myShared[len(myShared)-1:] != "/" {
-		myShared += "/"
+	if c.shared[len(c.shared)-1:] != "/" {
+		c.shared += "/"
 	}
 }
 
 // Função para a CLI/menu de interação com o usuário
-func cliInterface() {
+func cliInterface(client *Client) {
 	// Declara variável para o comando e saída, depois inicia o loop do menu
 	var comm string
 	var exit bool = false
 	for !exit {
 		// Indica que a CLI está esperando por uma entrada
-		waitingCli = true
+		client.waitingCli = true
 
 		// Imprime o menu de opções
 		logger.Std("\nEscolha um comando:\n")
@@ -141,28 +150,28 @@ func cliInterface() {
 		// Executa o comando correspondente
 		switch comm {
 		case "1":
-			commands.ListPeers(&knownPeers, myAddress)
+			commands.ListPeers(client.knownPeers, client.address)
 		case "2":
-			commands.GetPeersRequest(&knownPeers, myAddress)
+			commands.GetPeersRequest(client.knownPeers, client.address)
 		case "3":
-			commands.ListLocalFiles(myShared)
+			commands.ListLocalFiles(client.shared)
 		case "4":
-			commands.LsRequest(&knownPeers, myAddress, myShared)
+			commands.LsRequest(client.knownPeers, client.address, client.shared)
 		case "5":
 			logger.Std("Comando ainda não implementado.\n")
 		case "6":
-			tamanhoChunk = commands.ChangeChunk()
-			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(tamanhoChunk))
+			client.chunkSize = commands.ChangeChunk()
+			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(client.chunkSize))
 			//logger.Std("Comando ainda não implementado.\n")
 		case "9":
-			commands.ByeRequest(&knownPeers, myAddress)
+			commands.ByeRequest(client.knownPeers, client.address)
 			exit = true
 		default:
 			logger.Std("Comando inválido, tente novamente.\n")
 		}
 
 		// Indica que a CLI não está mais esperando por uma entrada
-		waitingCli = false
+		client.waitingCli = false
 		time.Sleep(500 * time.Millisecond)
 	}
 
@@ -171,9 +180,9 @@ func cliInterface() {
 }
 
 // Função para iniciar o peer e escutar conexões
-func listener() {
+func listener(client *Client) {
 	// Cria um listener TCP no endereço e porta especificado
-	listener, err := net.Listen("tcp", myAddress)
+	listener, err := net.Listen("tcp", client.address)
 	check(err)
 	defer listener.Close()
 
@@ -184,20 +193,20 @@ func listener() {
 		check(err)
 
 		// Cria uma goroutine/thread para lidar com a conexão recebida
-		go receiver(conn, &knownPeers, waitingCli)
+		go receiver(conn, client)
 	}
 }
 
 // Função para lidar com a conexão recebida
-func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
+func receiver(conn net.Conn, client *Client) {
 	// defer (adia) o fechamento da conexão até o final da função
 	defer conn.Close()
 
 	// Recebe a mensagem da conexão recebida
-	receivedMessage := connection.ReceiveMessage(knownPeers, conn)
+	receivedMessage := connection.ReceiveMessage(client.knownPeers, conn)
 
 	// Se a CLI está esperando por uma entrada formata
-	if waitingCli {
+	if client.waitingCli {
 		logger.Std("\n\n")
 	}
 	logger.Info("Mensagem recebida: \"" + receivedMessage.String() + "\"")
@@ -206,7 +215,7 @@ func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
 	clock.UpdateMaxClock(receivedMessage.Clock)
 
 	// Mostra mensagem de adição se não tinha o peer e atualização se tinha não é BYE
-	neighbor, exists := knownPeers.Get(receivedMessage.Origin)
+	neighbor, exists := client.knownPeers.Get(receivedMessage.Origin)
 	if !exists {
 		logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 	} else if receivedMessage.Type != message.BYE {
@@ -216,17 +225,17 @@ func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
 	// Lida o comando recebido de acordo com o tipo de mensagem
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
-		response.GetPeersResponse(knownPeers, receivedMessage.Origin, myAddress, conn)
+		response.GetPeersResponse(client.knownPeers, receivedMessage.Origin, client.address, conn)
 	case message.LS:
-		response.LsResponse(knownPeers, receivedMessage.Origin, myAddress, myShared, conn)
+		response.LsResponse(client.knownPeers, receivedMessage.Origin, client.address, client.shared, conn)
 	case message.DL:
-		response.DlResponse(knownPeers, receivedMessage, myAddress, myShared, conn)
+		response.DlResponse(client.knownPeers, receivedMessage, client.address, client.shared, conn)
 	case message.BYE:
-		response.ByeResponse(knownPeers, receivedMessage.Origin, neighbor.Clock)
+		response.ByeResponse(client.knownPeers, receivedMessage.Origin, neighbor.Clock)
 	}
 
 	// Verifica se a CLI está esperando por uma entrada
-	if waitingCli {
+	if client.waitingCli {
 		logger.Std("\n> ")
 	}
 }
@@ -234,23 +243,25 @@ func receiver(conn net.Conn, knownPeers *peers.SafePeers, waitingCli bool) {
 // Função principal do programa
 func main() {
 	// Verifica se o programa está sendo executado em modo de teste ou não
+	var client *Client
+
 	if len(os.Args) == 5 && os.Args[4] == "--test" {
 		// Cria os argumentos de teste
-		testArgs(os.Args)
+		client = testArgs(os.Args)
 	} else {
 		// Pega os argumentos de entrada
-		getArgs(os.Args)
+		client = getArgs(os.Args)
 
 		// Adiciona os vizinhos conhecidos no arquivo de vizinhos
-		addNeighbors()
+		client.addNeighbors()
 	}
 
 	// Verifica o diretório compartilhado
-	verifySharedDirectory()
+	client.verifySharedDirectory()
 
 	// Cria uma goroutine/thread para a CLI
-	go cliInterface()
+	go cliInterface(client)
 
 	// Inicializa o peer
-	listener()
+	listener(client)
 }
