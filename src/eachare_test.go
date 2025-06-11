@@ -5,9 +5,9 @@ import "testing"
 func TestGetArgs(t *testing.T) {
 	client := getArgs([]string{"eachare", "localhost:8080", "../neighbors/n1.txt", "../shared"})
 
-	if client.Address != "localhost:8080" {
+	if client.address != "localhost:8080" {
 		t.Errorf("Addrs is casting invalid!")
-		t.Errorf("Expected: %s, got: %s", "localhost:8080", client.Address)
+		t.Errorf("Expected: %s, got: %s", "localhost:8080", client.address)
 	}
 
 	if client.neighbors != "../neighbors/n1.txt" {

@@ -22,22 +22,22 @@ import (
 )
 
 type Client struct {
-	Address    string           // Endereço do peer
+	address    string           // Endereço do peer
 	neighbors  string           // Vizinhos do peer
 	shared     string           // Diretório compartilhado do peer
-	KnownPeers *peers.SafePeers // Lista dos peers conhecidos seguro para concorrência
-	WaitingCli bool             // Variável para controlar o estado do CLI
-	ChunkSize  int              // Tamanho do chunk
+	knownPeers *peers.SafePeers // Lista dos peers conhecidos seguro para concorrência
+	waitingCli bool             // Variável para controlar o estado do CLI
+	chunkSize  int              // Tamanho do chunk
 }
 
 func NewClient(address string, neighbors string, shared string) Client {
 	return Client{
-		Address:    address,
+		address:    address,
 		neighbors:  neighbors,
 		shared:     shared,
-		KnownPeers: &peers.SafePeers{},
-		WaitingCli: false,
-		ChunkSize:  256,
+		knownPeers: &peers.SafePeers{},
+		waitingCli: false,
+		chunkSize:  256,
 	}
 }
 
@@ -66,16 +66,16 @@ func testArgs(args []string) *Client {
 
 	// Cria um mapa de peers dinamicamente
 	if port%2 == 0 {
-		client.KnownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
-		client.KnownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+2), Status: peers.OFFLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+2), Status: peers.OFFLINE, Clock: 0})
 	} else {
-		client.KnownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
-		client.KnownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+3), Status: peers.OFFLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+3), Status: peers.OFFLINE, Clock: 0})
 	}
 
 	// Imprime os parâmetros de entrada
 	logger.Std("Modo de teste\n")
-	logger.Std("Endereço: " + client.Address + "\n")
+	logger.Std("Endereço: " + client.address + "\n")
 	logger.Std("Vizinhos: " + client.neighbors + "\n")
 	logger.Std("Diretório Compartilhado: " + client.shared + "\n")
 	return &client
@@ -109,7 +109,7 @@ func (c *Client) addNeighbors() {
 	// Lê o arquivo linha por linha
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		c.KnownPeers.Add(peers.Peer{Address: scanner.Text(), Status: peers.OFFLINE, Clock: 0})
+		c.knownPeers.Add(peers.Peer{Address: scanner.Text(), Status: peers.OFFLINE, Clock: 0})
 		logger.Std("Adicionando novo peer " + scanner.Text() + " status " + peers.OFFLINE.String() + "\n")
 	}
 }
@@ -130,7 +130,7 @@ func cliInterface(client *Client) {
 	var exit bool = false
 	for !exit {
 		// Indica que a CLI está esperando por uma entrada
-		client.WaitingCli = true
+		client.waitingCli = true
 
 		// Imprime o menu de opções
 		logger.Std("\nEscolha um comando:\n")
@@ -150,28 +150,28 @@ func cliInterface(client *Client) {
 		// Executa o comando correspondente
 		switch comm {
 		case "1":
-			commands.ListPeers(client.KnownPeers, client.Address)
+			commands.ListPeers(client.knownPeers, client.address)
 		case "2":
-			commands.GetPeersRequest(client.KnownPeers, client.Address)
+			commands.GetPeersRequest(client.knownPeers, client.address)
 		case "3":
 			commands.ListLocalFiles(client.shared)
 		case "4":
-			commands.LsRequest(client.KnownPeers, client.Address, client.shared)
+			commands.LsRequest(client.knownPeers, client.address, client.shared)
 		case "5":
 			logger.Std("Comando ainda não implementado.\n")
 		case "6":
-			client.ChunkSize = commands.ChangeChunk()
-			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(client.ChunkSize))
+			client.chunkSize = commands.ChangeChunk()
+			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(client.chunkSize))
 			//logger.Std("Comando ainda não implementado.\n")
 		case "9":
-			commands.ByeRequest(client.KnownPeers, client.Address)
+			commands.ByeRequest(client.knownPeers, client.address)
 			exit = true
 		default:
 			logger.Std("Comando inválido, tente novamente.\n")
 		}
 
 		// Indica que a CLI não está mais esperando por uma entrada
-		client.WaitingCli = false
+		client.waitingCli = false
 		time.Sleep(500 * time.Millisecond)
 	}
 
@@ -182,7 +182,7 @@ func cliInterface(client *Client) {
 // Função para iniciar o peer e escutar conexões
 func listener(client *Client) {
 	// Cria um listener TCP no endereço e porta especificado
-	listener, err := net.Listen("tcp", client.Address)
+	listener, err := net.Listen("tcp", client.address)
 	check(err)
 	defer listener.Close()
 
@@ -203,10 +203,10 @@ func receiver(conn net.Conn, client *Client) {
 	defer conn.Close()
 
 	// Recebe a mensagem da conexão recebida
-	receivedMessage := connection.ReceiveMessage(client.KnownPeers, conn)
+	receivedMessage := connection.ReceiveMessage(client.knownPeers, conn)
 
 	// Se a CLI está esperando por uma entrada formata
-	if client.WaitingCli {
+	if client.waitingCli {
 		logger.Std("\n\n")
 	}
 	logger.Info("Mensagem recebida: \"" + receivedMessage.String() + "\"")
@@ -215,7 +215,7 @@ func receiver(conn net.Conn, client *Client) {
 	clock.UpdateMaxClock(receivedMessage.Clock)
 
 	// Mostra mensagem de adição se não tinha o peer e atualização se tinha não é BYE
-	neighbor, exists := client.KnownPeers.Get(receivedMessage.Origin)
+	neighbor, exists := client.knownPeers.Get(receivedMessage.Origin)
 	if !exists {
 		logger.Info("Adicionando novo peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 	} else if receivedMessage.Type != message.BYE {
@@ -225,17 +225,17 @@ func receiver(conn net.Conn, client *Client) {
 	// Lida o comando recebido de acordo com o tipo de mensagem
 	switch receivedMessage.Type {
 	case message.GET_PEERS:
-		response.GetPeersResponse(client.KnownPeers, receivedMessage.Origin, client.Address, conn)
+		response.GetPeersResponse(client.knownPeers, receivedMessage.Origin, client.address, conn)
 	case message.LS:
-		response.LsResponse(client.KnownPeers, receivedMessage.Origin, client.Address, client.shared, conn)
+		response.LsResponse(client.knownPeers, receivedMessage.Origin, client.address, client.shared, conn)
 	case message.DL:
-		response.DlResponse(client.KnownPeers, receivedMessage, client.Address, client.shared, conn)
+		response.DlResponse(client.knownPeers, receivedMessage, client.address, client.shared, conn)
 	case message.BYE:
-		response.ByeResponse(client.KnownPeers, receivedMessage.Origin, neighbor.Clock)
+		response.ByeResponse(client.knownPeers, receivedMessage.Origin, neighbor.Clock)
 	}
 
 	// Verifica se a CLI está esperando por uma entrada
-	if client.WaitingCli {
+	if client.waitingCli {
 		logger.Std("\n> ")
 	}
 }
