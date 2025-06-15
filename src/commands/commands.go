@@ -21,7 +21,37 @@ import (
 type File struct {
 	name   string
 	size   int
-	origin string
+	origin []string
+}
+
+type FileList struct {
+	files []File
+}
+
+func (fl *FileList) Empty() bool {
+	return len(fl.files) == 0
+}
+
+func (fl *FileList) Len() int {
+	return len(fl.files)
+}
+
+func (fl *FileList) AppendFile(filename string, size int, origin string) {
+	for idx, file := range fl.files {
+		if file.name == filename && file.size == size {
+			fl.files[idx].AppendOrigin(origin)
+			return
+		}
+	}
+	fl.files = append(fl.files, File{filename, size, []string{origin}})
+}
+
+func (f *File) OriginsString() string {
+	return strings.Join(f.origin, ", ")
+}
+
+func (f *File) AppendOrigin(origin string) {
+	f.origin = append(f.origin, origin)
 }
 
 // Função para verificar e imprimir mensagem de erro
@@ -144,7 +174,7 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 
 	// Envia mensagem LS para cada peer conhecido online
 	var noPeers bool = true
-	var files []File
+	var files *FileList = &FileList{files: []File{}}
 	for _, peer := range knownPeers.GetAll() {
 		if !peer.Status {
 			continue
@@ -170,7 +200,7 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 				if err != nil {
 					continue
 				}
-				files = append(files, File{name: nameSize[0], size: size, origin: receivedMessage.Origin})
+				files.AppendFile(nameSize[0], size, receivedMessage.Origin)
 			}
 		}
 	}
@@ -178,7 +208,7 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 	// Chama a função para download apenas se havia arquivos disponíveis na busca
 	if noPeers {
 		logger.Std("Não havia nenhum peer online na busca\n")
-	} else if files == nil {
+	} else if files.Empty() {
 		logger.Std("\nNão havia nenhum arquivo disponível na busca\n")
 	} else {
 		DlRequest(knownPeers, senderAddress, sharedPath, files)
@@ -186,7 +216,7 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 }
 
 // Função para mensagem DL, escolhe um arquivo dentre os buscados para baixar
-func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, files []File) {
+func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, fileList *FileList) {
 	// Declara variável para o comando e inicia o loop do menu de arquivos
 	var comm string
 	for {
@@ -194,7 +224,7 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 		maxName := len("<Cancelar>")
 		maxSize := len("Tamanho")
 
-		for _, file := range files {
+		for _, file := range fileList.files {
 			if len(file.name) > maxName {
 				maxName = len(file.name)
 			}
@@ -216,8 +246,8 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 		logger.Std(fmt.Sprintf(row, 0, "<Cancelar>", "", ""))
 
 		// Lista os peers e cria uma lista dos endereços para enviar o HELLO
-		for i, file := range files {
-			logger.Std(fmt.Sprintf(row, i+1, file.name, strconv.Itoa(file.size), file.origin))
+		for i, file := range fileList.files {
+			logger.Std(fmt.Sprintf(row, i+1, file.name, strconv.Itoa(file.size), file.OriginsString()))
 		}
 
 		// Lê a entrada do usuário
@@ -235,8 +265,8 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 		// Solicitação de download para o arquivo escolhido
 		if number == 0 {
 			break
-		} else if number > 0 && number <= len(files) {
-			DlDownload(knownPeers, files[number-1], senderAddress, sharedPath)
+		} else if number > 0 && number <= fileList.Len() {
+			DlDownload(knownPeers, fileList.files[number-1], senderAddress, sharedPath)
 			break
 		} else {
 			logger.Std("\nOpção inválida, tente novamente.\n")
@@ -252,8 +282,8 @@ func DlDownload(knownPeers *peers.SafePeers, file File, senderAddress string, sh
 	logger.Std("\nArquivo escolhido " + file.name + "\n")
 
 	// Envia mensagem DL para o peer escolhido
-	conn, _ := net.Dial("tcp", file.origin)
-	connection.SendMessage(knownPeers, conn, sendMessage, file.origin)
+	conn, _ := net.Dial("tcp", file.origin[0])
+	connection.SendMessage(knownPeers, conn, sendMessage, file.origin[0])
 	if conn != nil {
 		defer conn.Close()
 		conn.SetDeadline(time.Now().Add(2 * time.Second))
