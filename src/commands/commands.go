@@ -4,6 +4,7 @@ package commands
 import (
 	"encoding/base64"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"strconv"
@@ -16,6 +17,12 @@ import (
 	"eachare/src/message"
 	"eachare/src/peers"
 )
+
+type File struct {
+	name   string
+	size   int
+	origin string
+}
 
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
@@ -137,7 +144,7 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 
 	// Envia mensagem LS para cada peer conhecido online
 	var noPeers bool = true
-	var files []string
+	var files []File
 	for _, peer := range knownPeers.GetAll() {
 		if !peer.Status {
 			continue
@@ -157,8 +164,13 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 
 			// Itera sobre os arquivos no argumento da mensagem recebida
 			for _, file := range receivedMessage.Arguments[1:] {
-				file = file + ":" + receivedMessage.Origin
-				files = append(files, file)
+
+				nameSize := strings.Split(file, ":")
+				size, err := strconv.Atoi(nameSize[1])
+				if err != nil {
+					continue
+				}
+				files = append(files, File{name: nameSize[0], size: size, origin: receivedMessage.Origin})
 			}
 		}
 	}
@@ -174,20 +186,23 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 }
 
 // Função para mensagem DL, escolhe um arquivo dentre os buscados para baixar
-func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, files []string) {
+func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, files []File) {
 	// Declara variável para o comando e inicia o loop do menu de arquivos
 	var comm string
 	for {
 		// Encontra o nome e o tamanho com maior quantidade de caracteres
 		maxName := len("<Cancelar>")
 		maxSize := len("Tamanho")
+
 		for _, file := range files {
-			fileParts := strings.SplitN(file, ":", 3)
-			if len(fileParts[0]) > maxName {
-				maxName = len(fileParts[0])
+			if len(file.name) > maxName {
+				maxName = len(file.name)
 			}
-			if len(fileParts[1]) > maxSize {
-				maxSize = len(fileParts[1])
+
+			lenSize := math.Floor(math.Log10((float64)(file.size))) + 1
+
+			if int(lenSize) > maxSize {
+				maxSize = int(lenSize)
 			}
 		}
 
@@ -202,8 +217,7 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 
 		// Lista os peers e cria uma lista dos endereços para enviar o HELLO
 		for i, file := range files {
-			fileParts := strings.SplitN(file, ":", 3)
-			logger.Std(fmt.Sprintf(row, i+1, fileParts[0], fileParts[1], fileParts[2]))
+			logger.Std(fmt.Sprintf(row, i+1, file.name, strconv.Itoa(file.size), file.origin))
 		}
 
 		// Lê a entrada do usuário
@@ -222,42 +236,45 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 		if number == 0 {
 			break
 		} else if number > 0 && number <= len(files) {
-			// Cria uma mensagem DL
-			chosenParts := strings.SplitN(files[number-1], ":", 3)
-			argument := []string{chosenParts[0], "0", "0"}
-			sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.DL, Arguments: argument}
-
-			logger.Std("\nArquivo escolhido " + chosenParts[0] + "\n")
-
-			// Envia mensagem DL para o peer escolhido
-			conn, _ := net.Dial("tcp", chosenParts[2])
-			connection.SendMessage(knownPeers, conn, sendMessage, chosenParts[2])
-			if conn != nil {
-				defer conn.Close()
-				conn.SetDeadline(time.Now().Add(2 * time.Second))
-
-				// Recebe a resposta apenas se a conexão for bem-sucedida
-				receivedMessage := connection.ReceiveMessage(knownPeers, conn)
-				logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
-				clock.UpdateMaxClock(receivedMessage.Clock)
-				logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
-
-				// Decodifica o conteúdo do arquivo recebido
-				decoded, err := base64.StdEncoding.DecodeString(receivedMessage.Arguments[3])
-				check(err)
-
-				// Cria/substitui o arquivo e escreve o conteúdo decodificado
-				file, err := os.Create(sharedPath + receivedMessage.Arguments[0])
-				check(err)
-				defer file.Close()
-				_, err = file.Write(decoded)
-				check(err)
-				logger.Std("\nDownload do arquivo " + receivedMessage.Arguments[0] + " finalizado.\n")
-			}
+			DlDownload(knownPeers, files[number-1], senderAddress, sharedPath)
 			break
 		} else {
 			logger.Std("\nOpção inválida, tente novamente.\n")
 		}
+	}
+}
+
+func DlDownload(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string) {
+	// Cria uma mensagem DL
+	argument := []string{file.name, "0", "0"}
+	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.DL, Arguments: argument}
+
+	logger.Std("\nArquivo escolhido " + file.name + "\n")
+
+	// Envia mensagem DL para o peer escolhido
+	conn, _ := net.Dial("tcp", file.origin)
+	connection.SendMessage(knownPeers, conn, sendMessage, file.origin)
+	if conn != nil {
+		defer conn.Close()
+		conn.SetDeadline(time.Now().Add(2 * time.Second))
+
+		// Recebe a resposta apenas se a conexão for bem-sucedida
+		receivedMessage := connection.ReceiveMessage(knownPeers, conn)
+		logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
+		clock.UpdateMaxClock(receivedMessage.Clock)
+		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+
+		// Decodifica o conteúdo do arquivo recebido
+		decoded, err := base64.StdEncoding.DecodeString(receivedMessage.Arguments[3])
+		check(err)
+
+		// Cria/substitui o arquivo e escreve o conteúdo decodificado
+		file, err := os.Create(sharedPath + receivedMessage.Arguments[0])
+		check(err)
+		defer file.Close()
+		_, err = file.Write(decoded)
+		check(err)
+		logger.Std("\nDownload do arquivo " + receivedMessage.Arguments[0] + " finalizado.\n")
 	}
 }
 
