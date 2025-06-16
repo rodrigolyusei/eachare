@@ -50,34 +50,35 @@ func check(err error) {
 
 // Função para modo de teste, simulando a execução do programa com argumentos específicos
 func testArgs() *Client {
-	port := 10000
-	file := 0
-
-	// Vai criando um listener TCP em portas diferentes até encontrar uma porta livre
+	// Vai testando portas diferentes até encontrar uma livre
+	counter := 0
 	for {
-		port++
-		file++
-		listener, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
-		if err != nil {
-			continue
+		counter++
+		listener, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(counter+10000))
+		if err == nil {
+			listener.Close()
+			break
 		}
-		listener.Close()
-		break
 	}
 
-	client := NewClient("127.0.0.1:"+strconv.Itoa(port), "Vizinhos teste", "../data/shared"+strconv.Itoa(file))
+	// Cria o cliente com os parâmetros de teste
+	client := NewClient("127.0.0.1:"+strconv.Itoa(counter+10000), "Vizinhos teste", "../data/shared"+strconv.Itoa(counter))
 
-	// Cria um mapa de peers dinamicamente
-	if port%2 == 0 {
-		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
-		logger.Std("Adicionando novo peer " + "127.0.0.1:" + strconv.Itoa(port+1) + " status " + peers.ONLINE.String() + "\n")
-		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+2), Status: peers.OFFLINE, Clock: 0})
-		logger.Std("Adicionando novo peer " + "127.0.0.1:" + strconv.Itoa(port+2) + " status " + peers.OFFLINE.String() + "\n")
+	// Cria o diretório compartilhado se não existir
+	err := os.MkdirAll(client.shared, 0755)
+	check(err)
+
+	// Cria os vizinhos dinamicamente
+	if counter%2 == 0 {
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(counter+10001), Status: peers.ONLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(counter+10002), Status: peers.OFFLINE, Clock: 0})
+		logger.Std("Adicionando novo peer 127.0.0.1:" + strconv.Itoa(counter+10001) + " status " + peers.ONLINE.String() + "\n")
+		logger.Std("Adicionando novo peer 127.0.0.1:" + strconv.Itoa(counter+10002) + " status " + peers.OFFLINE.String() + "\n")
 	} else {
-		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
-		logger.Std("Adicionando novo peer " + "127.0.0.1:" + strconv.Itoa(port+1) + " status " + peers.ONLINE.String() + "\n")
-		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+3), Status: peers.OFFLINE, Clock: 0})
-		logger.Std("Adicionando novo peer " + "127.0.0.1:" + strconv.Itoa(port+3) + " status " + peers.OFFLINE.String() + "\n")
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(counter+10001), Status: peers.ONLINE, Clock: 0})
+		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(counter+10003), Status: peers.OFFLINE, Clock: 0})
+		logger.Std("Adicionando novo peer 127.0.0.1:" + strconv.Itoa(counter+10001) + " status " + peers.ONLINE.String() + "\n")
+		logger.Std("Adicionando novo peer 127.0.0.1:" + strconv.Itoa(counter+10003) + " status " + peers.OFFLINE.String() + "\n")
 	}
 
 	// Imprime os parâmetros de entrada
