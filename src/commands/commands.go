@@ -330,13 +330,13 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	// Processa as respostas recebidas para verificar as falhas
 	receivedHashes := make([]string, totalRequests)
 	failedIndexes := make([]int, 0)
-	successfulPeers := make([]string, 0)
+	successfulPeers := make(map[int]string)
 	for dlResponse := range responses {
 		if dlResponse.err != nil {
 			failedIndexes = append(failedIndexes, dlResponse.index)
 		} else {
 			receivedHashes[dlResponse.index] = dlResponse.hash
-			successfulPeers = append(successfulPeers, dlResponse.origin)
+			successfulPeers[dlResponse.index] = dlResponse.origin
 		}
 	}
 	if len(failedIndexes) == len(file.origin) {
