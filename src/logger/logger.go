@@ -33,22 +33,18 @@ type Logger struct {
 	Level  LogLevel
 }
 
-func (l *Logger) Lock() {
-	l.mutex.Lock()
-}
-
-func (l *Logger) Unlock() {
-	l.mutex.Unlock()
-}
-
 func (l *Logger) Write(message string) LogMessage {
-	stdLogger.Lock()
-	defer stdLogger.Unlock()
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
 
 	l.logger.Print(message)
-
 	bufMessage := l.buffer.String()
 	l.buffer.Reset()
+
+	// Remove quebra de linha se a mensagem não tinha um
+	if l.Level == ZERO && message[len(message)-1] != '\n' {
+		bufMessage = bufMessage[:len(bufMessage)-1]
+	}
 
 	return LogMessage{level: l.Level, message: bufMessage}
 }
@@ -112,6 +108,7 @@ func init() {
 	stdLogger = Logger{
 		buffer: &stdBuf,
 		logger: log.New(&stdBuf, "", 0),
+		Level:  ZERO,
 	}
 
 	infoLogger = Logger{
