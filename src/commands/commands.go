@@ -279,6 +279,14 @@ type DlResponse struct {
 	err    error
 }
 
+func (dr DlResponse) String() string {
+	errMsg := "nil"
+	if dr.err != nil {
+		errMsg = dr.err.Error()
+	}
+	return fmt.Sprintf("index: %d, hash: %s, origin: %s, error: %s", dr.index, dr.hash, dr.origin, errMsg)
+}
+
 // Função para mensagem DL, solicita o download do arquivo escolhido em chunks
 func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int) {
 	logger.Std("\nArquivo escolhido " + file.name + "\n")
@@ -294,23 +302,27 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 		conn, err := net.Dial("tcp", receiver)
 		connection.SendMessage(knownPeers, conn, sendMessage, receiver)
 		if err != nil {
-			channel <- &DlResponse{index: index, err: err}
+			channel <- &DlResponse{index: index, err: err, origin: receiver}
 			return
 		}
 		defer conn.Close()
 		conn.SetDeadline(time.Now().Add(2 * time.Second))
 
 		receivedMessage := connection.ReceiveMessage(knownPeers, conn)
+		if receivedMessage.Origin == "" {
+			channel <- &DlResponse{index: index, err: err, origin: receiver}
+			return
+		}
 		logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
 		clock.UpdateMaxClock(receivedMessage.Clock)
 		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
 
 		receivedIdx, err := strconv.Atoi(receivedMessage.Arguments[2])
 		if err != nil {
-			channel <- &DlResponse{index: index, err: err, origin: receivedMessage.Origin}
+			channel <- &DlResponse{index: index, err: err, origin: receiver}
 			return
 		}
-		channel <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: receivedMessage.Origin}
+		channel <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: receiver}
 	}
 
 	// Envia requisições de download para cada chunk do arquivo
@@ -319,7 +331,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	wg.Add(totalRequests)
 	for index := range totalRequests {
 		senderIdx := index % len(file.origin)
-		sendRequest(file.origin[senderIdx], index, &wg, responses)
+		go sendRequest(file.origin[senderIdx], index, &wg, responses)
 	}
 	go func() {
 		wg.Wait()
@@ -330,22 +342,24 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	// Processa as respostas recebidas para verificar as falhas
 	receivedHashes := make([]string, totalRequests)
 	failedIndexes := make([]int, 0)
-	successfulPeers := make([]string, 0)
 	verifyPeers := make(map[string]bool)
 	for dlResponse := range responses {
 		if dlResponse.err != nil {
 			failedIndexes = append(failedIndexes, dlResponse.index)
+			verifyPeers[dlResponse.origin] = true
 		} else {
 			receivedHashes[dlResponse.index] = dlResponse.hash
-			if !verifyPeers[dlResponse.origin] {
-				successfulPeers = append(successfulPeers, dlResponse.origin)
-			}
-			verifyPeers[dlResponse.origin] = true
 		}
 	}
 	if len(failedIndexes) == len(file.origin) {
 		logger.Std("Todos os peers falharam ao enviar o arquivo. Processo cancelado.\n")
 		return
+	}
+	successfulPeers := make([]string, 0)
+	for _, origin := range file.origin {
+		if !verifyPeers[origin] {
+			successfulPeers = append(successfulPeers, origin)
+		}
 	}
 
 	// Se houver falhas, tenta reenviar as requisições dos chunks que falharam para outros peers
@@ -354,7 +368,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	retryWg.Add(len(failedIndexes))
 	for _, index := range failedIndexes {
 		senderIdx := index % len(successfulPeers)
-		sendRequest(successfulPeers[senderIdx], index, &retryWg, retryChan)
+		go sendRequest(successfulPeers[senderIdx], index, &retryWg, retryChan)
 	}
 	go func() {
 		retryWg.Wait()
@@ -365,7 +379,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	// Processa as respostas recebidas para verificar se houve falhas
 	for dlResponse := range retryChan {
 		if dlResponse.err != nil {
-			logger.Std("Retry do download falhado. Processo cancelado.\n")
+			logger.Std("Retry do download falhado. Processo cancelado. Falhei em refazer \n" + dlResponse.String())
 			return
 		}
 		receivedHashes[dlResponse.index] = dlResponse.hash
@@ -375,7 +389,14 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	var decodedChunks []byte
 	for i, r := range receivedHashes {
 		if r == "" {
-			panic(fmt.Sprintf("Chunk %d está vazio", i))
+			var wgh sync.WaitGroup
+			tempChan := make(chan *DlResponse)
+			wgh.Add(1)
+			senderIdx := i % len(successfulPeers)
+			sendRequest(successfulPeers[senderIdx], i, &wgh, tempChan)
+			k := <-tempChan
+			receivedHashes[i] = k.hash
+			//panic(fmt.Sprintf("Chunk %d está vazio. próximo chunk: %s", i, receivedHashes[i]))
 		}
 		dec, err := base64.StdEncoding.DecodeString(r)
 		if err != nil {

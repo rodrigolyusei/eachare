@@ -49,7 +49,9 @@ func SendMessage(knownPeers *peers.SafePeers, conn net.Conn, message message.Bas
 func ReceiveMessage(knownPeers *peers.SafePeers, conn net.Conn) message.BaseMessage {
 	// Lê a mensagem recebida no buffer até encontrar \n e constrói as partes da mensagem
 	msg, err := bufio.NewReader(conn).ReadString('\n')
-	check(err)
+	if err != nil {
+		return message.BaseMessage{Origin: "", Clock: 0, Type: message.UNKNOWN, Arguments: []string{}}
+	}
 	msg = strings.TrimSuffix(msg, "\n")
 	msgParts := strings.Split(msg, " ")
 
