@@ -62,7 +62,7 @@ func testArgs() *Client {
 	}
 
 	// Cria o cliente com os parâmetros de teste
-	client := NewClient("127.0.0.1:"+strconv.Itoa(counter+10000), "Vizinhos teste", "../data/shared"+strconv.Itoa(counter))
+	client := NewClient("127.0.0.1:"+strconv.Itoa(counter+10000), "Vizinhos teste", "../data/shared"+strconv.Itoa(counter)+"/")
 
 	// Cria o diretório compartilhado se não existir
 	err := os.MkdirAll(client.shared, 0755)
