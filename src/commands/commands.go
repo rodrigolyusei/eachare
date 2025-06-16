@@ -19,6 +19,7 @@ import (
 	"eachare/src/peers"
 )
 
+// Estrutura para um arquivo do download
 type File struct {
 	name   string
 	size   int
@@ -33,6 +34,7 @@ func (f *File) AppendOrigin(origin string) {
 	f.origin = append(f.origin, origin)
 }
 
+// Estrutura para lista de arquivos do download
 type FileList struct {
 	files []File
 }
@@ -195,7 +197,6 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 
 			// Itera sobre os arquivos no argumento da mensagem recebida
 			for _, file := range receivedMessage.Arguments[1:] {
-
 				nameSize := strings.Split(file, ":")
 				size, err := strconv.Atoi(nameSize[1])
 				if err != nil {
@@ -208,36 +209,32 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 
 	// Chama a função para download apenas se havia arquivos disponíveis na busca
 	if noPeers {
-		logger.Std("Não havia nenhum peer online na busca\n")
+		logger.Std("\nNão havia nenhum peer online na busca\n")
 	} else if files.Empty() {
 		logger.Std("\nNão havia nenhum arquivo disponível na busca\n")
 	} else {
-		ListDownloadFiles(knownPeers, senderAddress, sharedPath, files, chunkSize)
+		DlMenu(knownPeers, senderAddress, sharedPath, files, chunkSize)
 	}
 }
 
 // Função para mensagem DL, escolhe um arquivo dentre os buscados para baixar
-func ListDownloadFiles(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, fileList *FileList, chunkSize int) {
+func DlMenu(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, fileList *FileList, chunkSize int) {
 	// Declara variável para o comando e inicia o loop do menu de arquivos
 	var comm string
 	for {
 		// Encontra o nome e o tamanho com maior quantidade de caracteres
 		maxName := len("<Cancelar>")
 		maxSize := len("Tamanho")
-
 		for _, file := range fileList.files {
 			if len(file.name) > maxName {
 				maxName = len(file.name)
 			}
-
-			lenSize := math.Floor(math.Log10((float64)(file.size))) + 1
-
-			if int(lenSize) > maxSize {
-				maxSize = int(lenSize)
+			if len(strconv.Itoa(file.size)) > maxSize {
+				maxSize = len(strconv.Itoa(file.size))
 			}
 		}
 
-		// Formata o cabeçalho e a linha do menu
+		// Formata o menu de opções
 		header := fmt.Sprintf("\t     %%-%ds | %%-%ds | %%s\n", maxName, maxSize)
 		row := fmt.Sprintf("\t[%%2d] %%-%ds | %%-%ds | %%s\n", maxName, maxSize)
 
@@ -274,6 +271,7 @@ func ListDownloadFiles(knownPeers *peers.SafePeers, senderAddress string, shared
 	}
 }
 
+// Estrutura para resposta do download
 type DlResponse struct {
 	index  int
 	hash   string
@@ -281,24 +279,22 @@ type DlResponse struct {
 	err    error
 }
 
+// Função para mensagem DL, solicita o download do arquivo escolhido em chunks
 func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int) {
-
 	logger.Std("\nArquivo escolhido " + file.name + "\n")
 
+	// Calcula a quantidade de requisições necessárias e cria o canal de respostas
 	totalRequests := int(math.Ceil(float64(file.size) / float64(chunkSize)))
 
-	responses := make(chan *DlResponse, totalRequests)
-	var wg sync.WaitGroup
-	wg.Add(totalRequests)
-
-	sendRequest := func(receiver string, index int) {
-		defer wg.Done()
+	// Função para enviar requisições de download para o chunk especificado
+	sendRequest := func(receiver string, index int, waitgroup *sync.WaitGroup, channel chan *DlResponse) {
+		defer waitgroup.Done()
 		arguments := []string{file.name, strconv.Itoa(chunkSize), strconv.Itoa(index)}
 		sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.DL, Arguments: arguments}
 		conn, err := net.Dial("tcp", receiver)
 		connection.SendMessage(knownPeers, conn, sendMessage, receiver)
 		if err != nil {
-			responses <- &DlResponse{index: index, err: err}
+			channel <- &DlResponse{index: index, err: err}
 			return
 		}
 		defer conn.Close()
@@ -311,58 +307,50 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 
 		receivedIdx, err := strconv.Atoi(receivedMessage.Arguments[2])
 		if err != nil {
-			responses <- &DlResponse{index: index, err: err, origin: receivedMessage.Origin}
+			channel <- &DlResponse{index: index, err: err, origin: receivedMessage.Origin}
 			return
 		}
-		responses <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil,
-			origin: receivedMessage.Origin}
+		channel <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: receivedMessage.Origin}
+	}
+
+	// Envia requisições de download para cada chunk do arquivo
+	responses := make(chan *DlResponse, totalRequests)
+	var wg sync.WaitGroup
+	wg.Add(totalRequests)
+	for index := range totalRequests {
+		senderIdx := index % len(file.origin)
+		sendRequest(file.origin[senderIdx], index, &wg, responses)
 	}
 	go func() {
 		wg.Wait()
 		close(responses)
 	}()
-
-	for index := range totalRequests {
-		senderIdx := index % len(file.origin)
-		sendRequest(file.origin[senderIdx], index)
-	}
-
 	wg.Wait()
 
-	received := make([]string, totalRequests)
-	var failed []DlResponse
-	failingPeers := make(map[string]bool)
+	// Processa as respostas recebidas para verificar as falhas
+	receivedHashes := make([]string, totalRequests)
+	failedIndexes := make([]int, 0)
+	successfulPeers := make([]string, 0)
 	for dlResponse := range responses {
 		if dlResponse.err != nil {
-			failed = append(failed, *dlResponse)
-			failingPeers[dlResponse.origin] = true
+			failedIndexes = append(failedIndexes, dlResponse.index)
 		} else {
-			received[dlResponse.index] = dlResponse.hash
+			receivedHashes[dlResponse.index] = dlResponse.hash
+			successfulPeers = append(successfulPeers, dlResponse.origin)
 		}
 	}
-	if len(failingPeers) == len(file.origin) {
+	if len(failedIndexes) == len(file.origin) {
 		logger.Std("Todos os peers falharam ao enviar o arquivo. Processo cancelado.\n")
 		return
 	}
 
-	retryChan := make(chan DlResponse, len(failed))
+	// Se houver falhas, tenta reenviar as requisições dos chunks que falharam para outros peers
+	retryChan := make(chan *DlResponse, len(failedIndexes))
 	var retryWg sync.WaitGroup
-	retryWg.Add(len(failed))
-	for _, failedRequest := range failed {
-		tries := 1
-		senderIdx := failedRequest.index % len(file.origin)
-		for failingPeers[file.origin[senderIdx]] {
-			tries++
-			senderIdx++
-			if senderIdx == len(file.origin) {
-				senderIdx = 0
-			}
-			if tries == len(file.origin) {
-				logger.Std("Todos os peers falharam ao enviar o arquivo. Processo cancelado.\n")
-				return
-			}
-		}
-		sendRequest(file.origin[senderIdx], failedRequest.index)
+	retryWg.Add(len(failedIndexes))
+	for _, index := range failedIndexes {
+		senderIdx := index % len(successfulPeers)
+		sendRequest(successfulPeers[senderIdx], index, &retryWg, retryChan)
 	}
 	go func() {
 		retryWg.Wait()
@@ -370,16 +358,18 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	}()
 	retryWg.Wait()
 
+	// Processa as respostas recebidas para verificar se houve falhas
 	for dlResponse := range responses {
 		if dlResponse.err != nil {
-			logger.Std("Todos os peers falharam ao enviar o arquivo. Processo cancelado.\n")
+			logger.Std("Retry do download falahado. Processo cancelado.\n")
 			return
 		}
-		received[dlResponse.index] = dlResponse.hash
+		receivedHashes[dlResponse.index] = dlResponse.hash
 	}
 
+	// Decodifica os chunks recebidos e junta
 	var decodedChunks []byte
-	for i, r := range received {
+	for i, r := range receivedHashes {
 		if r == "" {
 			panic(fmt.Sprintf("Chunk %d está vazio", i))
 		}
@@ -397,7 +387,22 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	_, err = createdFile.Write(decodedChunks)
 	check(err)
 	logger.Std("\nDownload do arquivo " + file.name + " finalizado.\n")
+}
 
+// Função para alterar o tamanho do chunk
+func ChangeChunk(chunkSize *int) {
+	var chunk string
+	logger.Std("\nDigite novo tamanho de chunk:\n> ")
+	for {
+		fmt.Scanln(&chunk)
+		number, err := strconv.Atoi(chunk)
+		if err == nil && number > 0 {
+			*chunkSize = number
+			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(number))
+			return
+		}
+		logger.Std("\nValor inválido. Precisa ser um inteiro maior que 0.\n> ")
+	}
 }
 
 // Função para mensagem BYE, avisando os peers sobre a saída
@@ -417,22 +422,5 @@ func ByeRequest(knownPeers *peers.SafePeers, senderAddress string) {
 			defer conn.Close()
 			conn.SetDeadline(time.Now().Add(2 * time.Second))
 		}
-	}
-}
-
-// Função para alterar o tamanho do chunk
-func ChangeChunk(chunkSize *int) {
-	var chunk string
-	logger.Std("\nDigite novo tamanho de chunk:\n> ")
-	for {
-		fmt.Scanln(&chunk)
-		number, err := strconv.Atoi(chunk)
-
-		if err == nil && number > 0 {
-			*chunkSize = number
-			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(number))
-			return
-		}
-		logger.Std("\nValor inválido. Precisa ser um inteiro maior que 0.\n> ")
 	}
 }
