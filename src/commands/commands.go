@@ -25,6 +25,14 @@ type File struct {
 	origin []string
 }
 
+func (f *File) OriginsString() string {
+	return strings.Join(f.origin, ", ")
+}
+
+func (f *File) AppendOrigin(origin string) {
+	f.origin = append(f.origin, origin)
+}
+
 type FileList struct {
 	files []File
 }
@@ -45,14 +53,6 @@ func (fl *FileList) AppendFile(filename string, size int, origin string) {
 		}
 	}
 	fl.files = append(fl.files, File{filename, size, []string{origin}})
-}
-
-func (f *File) OriginsString() string {
-	return strings.Join(f.origin, ", ")
-}
-
-func (f *File) AppendOrigin(origin string) {
-	f.origin = append(f.origin, origin)
 }
 
 // Função para verificar e imprimir mensagem de erro
@@ -212,12 +212,12 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 	} else if files.Empty() {
 		logger.Std("\nNão havia nenhum arquivo disponível na busca\n")
 	} else {
-		DlRequest(knownPeers, senderAddress, sharedPath, files, chunkSize)
+		ListDownloadFiles(knownPeers, senderAddress, sharedPath, files, chunkSize)
 	}
 }
 
 // Função para mensagem DL, escolhe um arquivo dentre os buscados para baixar
-func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, fileList *FileList, chunkSize int) {
+func ListDownloadFiles(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, fileList *FileList, chunkSize int) {
 	// Declara variável para o comando e inicia o loop do menu de arquivos
 	var comm string
 	for {
@@ -252,8 +252,7 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 		}
 
 		// Lê a entrada do usuário
-		logger.Std("\nDigite o numero do arquivo para fazer o download:\n")
-		logger.Std("> ")
+		logger.Std("\nDigite o numero do arquivo para fazer o download:\n> ")
 		fmt.Scanln(&comm)
 
 		// Converte a entrada para inteiro
@@ -267,7 +266,7 @@ func DlRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 		if number == 0 {
 			break
 		} else if number > 0 && number <= fileList.Len() {
-			DlDownload(knownPeers, fileList.files[number-1], senderAddress, sharedPath, chunkSize)
+			DlRequest(knownPeers, fileList.files[number-1], senderAddress, sharedPath, chunkSize)
 			break
 		} else {
 			logger.Std("\nOpção inválida, tente novamente.\n")
@@ -282,7 +281,7 @@ type DlResponse struct {
 	err    error
 }
 
-func DlDownload(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int) {
+func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int) {
 
 	logger.Std("\nArquivo escolhido " + file.name + "\n")
 
@@ -421,16 +420,18 @@ func ByeRequest(knownPeers *peers.SafePeers, senderAddress string) {
 	}
 }
 
-func ChangeChunk() int {
+// Função para alterar o tamanho do chunk
+func ChangeChunk(chunkSize *int) {
 	var chunk string
-	logger.Std("\nDigite novo tamanho de chunk:\n>")
+	logger.Std("\nDigite novo tamanho de chunk:\n> ")
 	for {
 		fmt.Scanln(&chunk)
 		number, err := strconv.Atoi(chunk)
 
 		if err == nil && number > 0 {
-			return number
+			*chunkSize = number
+			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(number))
 		}
-		logger.Std("\nValor inválido. Precisa ser um inteiro maior que 0.\n>")
+		logger.Std("\nValor inválido. Precisa ser um inteiro maior que 0.\n> ")
 	}
 }

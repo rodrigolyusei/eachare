@@ -140,10 +140,9 @@ func cliInterface(client *Client) {
 		logger.Std("\t[4] Buscar arquivos\n")
 		logger.Std("\t[5] Exibir estatisticas\n")
 		logger.Std("\t[6] Alterar tamanho de chunk\n")
-		logger.Std("\t[9] Sair\n")
+		logger.Std("\t[9] Sair\n> ")
 
 		// Lê a entrada do usuário
-		logger.Std("> ")
 		fmt.Scanln(&comm)
 		logger.Std("\n")
 
@@ -160,9 +159,7 @@ func cliInterface(client *Client) {
 		case "5":
 			logger.Std("Comando ainda não implementado.\n")
 		case "6":
-			client.chunkSize = commands.ChangeChunk()
-			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(client.chunkSize))
-			//logger.Std("Comando ainda não implementado.\n")
+			commands.ChangeChunk(&client.chunkSize)
 		case "9":
 			commands.ByeRequest(client.knownPeers, client.address)
 			exit = true
