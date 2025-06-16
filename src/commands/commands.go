@@ -363,9 +363,9 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	retryWg.Wait()
 
 	// Processa as respostas recebidas para verificar se houve falhas
-	for dlResponse := range responses {
+	for dlResponse := range retryChan {
 		if dlResponse.err != nil {
-			logger.Std("Retry do download falahado. Processo cancelado.\n")
+			logger.Std("Retry do download falhado. Processo cancelado.\n")
 			return
 		}
 		receivedHashes[dlResponse.index] = dlResponse.hash
