@@ -156,7 +156,7 @@ func cliInterface(client *Client) {
 		case "3":
 			commands.ListLocalFiles(client.shared)
 		case "4":
-			commands.LsRequest(client.knownPeers, client.address, client.shared)
+			commands.LsRequest(client.knownPeers, client.address, client.shared, client.chunkSize)
 		case "5":
 			logger.Std("Comando ainda não implementado.\n")
 		case "6":

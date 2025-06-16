@@ -62,12 +62,25 @@ func LsResponse(knownPeers *peers.SafePeers, receiverAddress string, senderAddre
 func DlResponse(knownPeers *peers.SafePeers, receivedMessage message.BaseMessage, senderAddress string, sharedPath string, conn net.Conn) {
 	// Lê o arquivo escolhido e codifica em base64
 	chosenFile := receivedMessage.Arguments[0]
-	data, err := os.ReadFile(sharedPath + "/" + chosenFile)
-	check(err)
-	encoded := base64.StdEncoding.EncodeToString(data)
+	receivedChunkSizeString := receivedMessage.Arguments[1]
+	receivedChunkSize, _ := strconv.Atoi(receivedChunkSizeString)
+	indexString := receivedMessage.Arguments[2]
+	index, _ := strconv.Atoi(indexString)
 
+	data, err := os.ReadFile(sharedPath + "/" + chosenFile)
+	//totalIdx := math.Ceil(float64(len(data))/(float64(receivedChunkSize))) - 1
+	check(err)
+
+	start := index * receivedChunkSize
+	end := start + receivedChunkSize
+	if end > len(data) {
+		end = len(data)
+	}
+	selected := data[start:end]
+
+	encoded := base64.StdEncoding.EncodeToString(selected)
 	// Cria o argumento sobre o arquivo e envia a mensagem
-	arguments := []string{receivedMessage.Arguments[0], "0", "0", encoded}
+	arguments := []string{receivedMessage.Arguments[0], strconv.Itoa(len(selected)), indexString, encoded}
 	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.FILE, Arguments: arguments}
 	connection.SendMessage(knownPeers, conn, sendMessage, receivedMessage.Origin)
 }
