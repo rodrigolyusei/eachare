@@ -431,6 +431,7 @@ func ChangeChunk(chunkSize *int) {
 		if err == nil && number > 0 {
 			*chunkSize = number
 			logger.Info("Tamanho de chunk alterado: " + strconv.Itoa(number))
+			return
 		}
 		logger.Std("\nValor inválido. Precisa ser um inteiro maior que 0.\n> ")
 	}

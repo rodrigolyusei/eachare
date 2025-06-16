@@ -49,11 +49,14 @@ func check(err error) {
 }
 
 // Função para modo de teste, simulando a execução do programa com argumentos específicos
-func testArgs(args []string) *Client {
+func testArgs() *Client {
 	port := 10000
+	file := 0
+
 	// Vai criando um listener TCP em portas diferentes até encontrar uma porta livre
 	for {
 		port++
+		file++
 		listener, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
 		if err != nil {
 			continue
@@ -62,19 +65,23 @@ func testArgs(args []string) *Client {
 		break
 	}
 
-	client := NewClient("127.0.0.1:"+strconv.Itoa(port), args[2], args[3])
+	client := NewClient("127.0.0.1:"+strconv.Itoa(port), "Vizinhos teste", "../data/shared"+strconv.Itoa(file))
 
 	// Cria um mapa de peers dinamicamente
 	if port%2 == 0 {
 		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
+		logger.Std("Adicionando novo peer " + "127.0.0.1:" + strconv.Itoa(port+1) + " status " + peers.ONLINE.String() + "\n")
 		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+2), Status: peers.OFFLINE, Clock: 0})
+		logger.Std("Adicionando novo peer " + "127.0.0.1:" + strconv.Itoa(port+2) + " status " + peers.OFFLINE.String() + "\n")
 	} else {
 		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+1), Status: peers.ONLINE, Clock: 0})
+		logger.Std("Adicionando novo peer " + "127.0.0.1:" + strconv.Itoa(port+1) + " status " + peers.ONLINE.String() + "\n")
 		client.knownPeers.Add(peers.Peer{Address: "127.0.0.1:" + strconv.Itoa(port+3), Status: peers.OFFLINE, Clock: 0})
+		logger.Std("Adicionando novo peer " + "127.0.0.1:" + strconv.Itoa(port+3) + " status " + peers.OFFLINE.String() + "\n")
 	}
 
 	// Imprime os parâmetros de entrada
-	logger.Std("Modo de teste\n")
+	logger.Std("\nModo de teste\n")
 	logger.Std("Endereço: " + client.address + "\n")
 	logger.Std("Vizinhos: " + client.neighbors + "\n")
 	logger.Std("Diretório Compartilhado: " + client.shared + "\n")
@@ -116,11 +123,11 @@ func (c *Client) addNeighbors() {
 
 // Verifica se o diretório compartilhado existe e está acessível
 func (c *Client) verifySharedDirectory() {
-	_, err := os.ReadDir(c.shared)
-	check(err)
 	if c.shared[len(c.shared)-1:] != "/" {
 		c.shared += "/"
 	}
+	_, err := os.ReadDir(c.shared)
+	check(err)
 }
 
 // Função para a CLI/menu de interação com o usuário
@@ -242,9 +249,9 @@ func main() {
 	// Verifica se o programa está sendo executado em modo de teste ou não
 	var client *Client
 
-	if len(os.Args) == 5 && os.Args[4] == "--test" {
+	if len(os.Args) == 2 && os.Args[1] == "--test" {
 		// Cria os argumentos de teste
-		client = testArgs(os.Args)
+		client = testArgs()
 	} else {
 		// Pega os argumentos de entrada
 		client = getArgs(os.Args)
