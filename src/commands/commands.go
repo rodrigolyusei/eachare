@@ -2,9 +2,12 @@ package commands
 
 // Pacotes nativos de go e pacotes internos
 import (
+	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -18,6 +21,55 @@ import (
 	"eachare/src/message"
 	"eachare/src/peers"
 )
+
+const maxConcurrent = 50
+
+type HealthyOrigins struct {
+	mu      sync.Mutex
+	origins []string
+}
+
+func NewHealthyOrigins(initialOrigins []string) *HealthyOrigins {
+	return &HealthyOrigins{
+		origins: initialOrigins,
+	}
+}
+
+func (h *HealthyOrigins) Remove(originToRemove string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for i, origin := range h.origins {
+		if origin == originToRemove {
+			h.origins = append(h.origins[:i], h.origins[i+1:]...)
+			return
+		}
+	}
+}
+
+func (h *HealthyOrigins) GetNext() (string, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if len(h.origins) == 0 {
+		return "", errors.New("no healthy origins available")
+	}
+
+	randomIndex := rand.Intn(len(h.origins))
+	return h.origins[randomIndex], nil
+}
+
+func (h *HealthyOrigins) GetAll() ([]string, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if len(h.origins) == 0 {
+		return nil, errors.New("no healthy origins available")
+	}
+	listCopy := make([]string, len(h.origins))
+	copy(listCopy, h.origins)
+	return listCopy, nil
+}
 
 // Estrutura para um arquivo do download
 type File struct {
@@ -287,6 +339,167 @@ func (dr DlResponse) String() string {
 	return fmt.Sprintf("index: %d, hash: %s, origin: %s, error: %s", dr.index, dr.hash, dr.origin, errMsg)
 }
 
+type OriginManagerConfig struct {
+	knownPeers     *peers.SafePeers
+	file           *File
+	senderAddress  string
+	chunkSize      int
+	resultCh       chan *DlResponse
+	retryCh        chan *DlResponse
+	rebalanceCh    chan *ManagerError
+	mainWg         *sync.WaitGroup
+	healthyOrigins *HealthyOrigins
+}
+
+type OriginManager struct {
+	origin string
+	wg     *sync.WaitGroup
+	cfg    *OriginManagerConfig
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+type ManagerError struct {
+	lastCreatedIndex int
+	finalIndex       int
+	origin           string
+}
+
+func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginManagerConfig, wg *sync.WaitGroup, index int, origin string) {
+	defer wg.Done()
+
+	arguments := []string{cfg.file.name, strconv.Itoa(cfg.chunkSize), strconv.Itoa(index)}
+	sendMessage := message.BaseMessage{Origin: cfg.senderAddress, Clock: 0, Type: message.DL, Arguments: arguments}
+
+	dialer := &net.Dialer{}
+	conn, err := dialer.DialContext(ctx, "tcp", origin)
+	connection.SendMessage(cfg.knownPeers, conn, sendMessage, origin)
+	if err != nil {
+		defer cancel()
+		cfg.retryCh <- &DlResponse{index: index, err: err, origin: origin}
+		return
+	}
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(10 * time.Second))
+
+	// Receive the response
+	receivedMessage := connection.ReceiveMessage(cfg.knownPeers, conn)
+	if receivedMessage.Origin == "" {
+		err := fmt.Errorf("empty response from origin %s for chunk %d", origin, index)
+		cfg.retryCh <- &DlResponse{index: index, err: err, origin: origin}
+		defer cancel()
+		return
+	}
+
+	logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
+	clock.UpdateMaxClock(receivedMessage.Clock)
+	logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+
+	receivedIdx, err := strconv.Atoi(receivedMessage.Arguments[2])
+	if err != nil {
+		defer cancel()
+		cfg.retryCh <- &DlResponse{index: index, err: err, origin: origin}
+		return
+	}
+
+	cfg.resultCh <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: receivedMessage.Origin}
+}
+
+func (om *OriginManager) createRequests(initialIndex, finalIndex int) {
+	defer om.cfg.mainWg.Done()
+
+	sem := make(chan struct{}, maxConcurrent)
+	var lastCreatedIndex int
+mainloop:
+	for indexNum := initialIndex; indexNum < finalIndex; indexNum++ {
+		select {
+		case <-om.ctx.Done():
+			lastCreatedIndex = indexNum
+			om.cfg.rebalanceCh <- &ManagerError{
+				lastCreatedIndex: lastCreatedIndex,
+				finalIndex:       finalIndex,
+				origin:           om.origin,
+			}
+			om.cfg.healthyOrigins.Remove(om.origin)
+			break mainloop
+		default:
+			sem <- struct{}{}
+			om.wg.Add(1)
+			go func(index int) {
+				defer func() { <-sem }()
+				requestChunk(om.ctx, om.cancel, om.cfg, om.wg, index, om.origin)
+			}(indexNum)
+		}
+	}
+	om.wg.Wait()
+}
+
+const MAX_RETRIES_PER_CHUNK = 3
+
+func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
+	defer retryWg.Done()
+
+	retryCounts := make(map[int]int)
+
+	for failedReq := range cfg.retryCh {
+		chunkIndex := failedReq.index
+		failedOrigin := failedReq.origin
+
+		cfg.healthyOrigins.Remove(failedOrigin)
+
+		retryCounts[chunkIndex]++
+		if retryCounts[chunkIndex] > MAX_RETRIES_PER_CHUNK {
+			panic(fmt.Sprintf("Chunk %d failed more than %d times. Aborting download.", chunkIndex, MAX_RETRIES_PER_CHUNK))
+		}
+
+		newOrigin, err := cfg.healthyOrigins.GetNext()
+		if err != nil {
+			panic(fmt.Sprintf("No healthy peers available to retry chunk %d. Aborting download. %s", chunkIndex, failedReq.err))
+		}
+
+		retryWg.Add(1)
+		ctx, cancel := context.WithCancel(context.Background())
+		go requestChunk(ctx, cancel, cfg, retryWg, chunkIndex, newOrigin)
+	}
+}
+
+func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
+	defer rebalanceWg.Done()
+
+	for job := range cfg.rebalanceCh {
+		chunksToRebalance := make([]int, 0, job.finalIndex-job.lastCreatedIndex)
+		for i := job.lastCreatedIndex; i < job.finalIndex; i++ {
+			chunksToRebalance = append(chunksToRebalance, i)
+		}
+
+		if len(chunksToRebalance) == 0 {
+			continue
+		}
+
+		healthyPeers, err := cfg.healthyOrigins.GetAll()
+		if err != nil {
+			panic(fmt.Sprintf("Cannot rebalance chunks: %v. Aborting download. %d, %d", err, job.lastCreatedIndex, job.finalIndex))
+		}
+
+		peerCount := len(healthyPeers)
+		for i, chunkIndex := range chunksToRebalance {
+			peerIndex := i % peerCount
+			newOrigin := healthyPeers[peerIndex]
+
+			rebalanceWg.Add(1)
+			context, cancel := context.WithCancel(context.Background())
+			go requestChunk(
+				context,
+				cancel,
+				cfg,
+				rebalanceWg,
+				chunkIndex,
+				newOrigin,
+			)
+		}
+	}
+}
+
 // Função para mensagem DL, solicita o download do arquivo escolhido em chunks
 func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int) {
 	logger.Std("\nArquivo escolhido " + file.name + "\n")
@@ -294,94 +507,79 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	// Calcula a quantidade de requisições necessárias e cria o canal de respostas
 	totalRequests := int(math.Ceil(float64(file.size) / float64(chunkSize)))
 
-	// Função para enviar requisições de download para o chunk especificado
-	sendRequest := func(receiver string, index int, waitgroup *sync.WaitGroup, channel chan *DlResponse) {
-		defer waitgroup.Done()
-		arguments := []string{file.name, strconv.Itoa(chunkSize), strconv.Itoa(index)}
-		sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.DL, Arguments: arguments}
-		conn, err := net.Dial("tcp", receiver)
-		connection.SendMessage(knownPeers, conn, sendMessage, receiver)
-		if err != nil {
-			channel <- &DlResponse{index: index, err: err, origin: receiver}
-			return
-		}
-		defer conn.Close()
-		conn.SetDeadline(time.Now().Add(2 * time.Second))
+	resultCh := make(chan *DlResponse, totalRequests)
+	retryCh := make(chan *DlResponse, totalRequests)
+	rebalanceCh := make(chan *ManagerError, len(file.origin))
 
-		receivedMessage := connection.ReceiveMessage(knownPeers, conn)
-		if receivedMessage.Origin == "" {
-			channel <- &DlResponse{index: index, err: err, origin: receiver}
-			return
-		}
-		logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
-		clock.UpdateMaxClock(receivedMessage.Clock)
-		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
-
-		receivedIdx, err := strconv.Atoi(receivedMessage.Arguments[2])
-		if err != nil {
-			channel <- &DlResponse{index: index, err: err, origin: receiver}
-			return
-		}
-		channel <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: receiver}
-	}
-
-	// Envia requisições de download para cada chunk do arquivo
-	responses := make(chan *DlResponse, totalRequests)
-	var wg sync.WaitGroup
-	wg.Add(totalRequests)
-	for index := range totalRequests {
-		senderIdx := index % len(file.origin)
-		go sendRequest(file.origin[senderIdx], index, &wg, responses)
-	}
-	go func() {
-		wg.Wait()
-		close(responses)
-	}()
-	wg.Wait()
-
-	// Processa as respostas recebidas para verificar as falhas
-	receivedHashes := make([]string, totalRequests)
-	failedIndexes := make([]int, 0)
-	verifyPeers := make(map[string]bool)
-	for dlResponse := range responses {
-		if dlResponse.err != nil {
-			failedIndexes = append(failedIndexes, dlResponse.index)
-			verifyPeers[dlResponse.origin] = true
-		} else {
-			receivedHashes[dlResponse.index] = dlResponse.hash
-		}
-	}
-	if len(failedIndexes) == len(file.origin) {
-		logger.Std("Todos os peers falharam ao enviar o arquivo. Processo cancelado.\n")
-		return
-	}
-	successfulPeers := make([]string, 0)
-	for _, origin := range file.origin {
-		if !verifyPeers[origin] {
-			successfulPeers = append(successfulPeers, origin)
-		}
-	}
-
-	// Se houver falhas, tenta reenviar as requisições dos chunks que falharam para outros peers
-	retryChan := make(chan *DlResponse, len(failedIndexes))
 	var retryWg sync.WaitGroup
-	retryWg.Add(len(failedIndexes))
-	for _, index := range failedIndexes {
-		senderIdx := index % len(successfulPeers)
-		go sendRequest(successfulPeers[senderIdx], index, &retryWg, retryChan)
-	}
-	go func() {
-		retryWg.Wait()
-		close(retryChan)
-	}()
-	retryWg.Wait()
+	var rebalanceWg sync.WaitGroup
 
-	// Processa as respostas recebidas para verificar se houve falhas
-	for dlResponse := range retryChan {
-		if dlResponse.err != nil {
-			logger.Std("Retry do download falhado. Processo cancelado. Falhei em refazer \n" + dlResponse.String())
-			return
+	cfg := OriginManagerConfig{
+		knownPeers:     knownPeers,
+		file:           &file,
+		senderAddress:  senderAddress,
+		chunkSize:      chunkSize,
+		resultCh:       resultCh,
+		retryCh:        retryCh,
+		rebalanceCh:    rebalanceCh,
+		mainWg:         &sync.WaitGroup{},
+		healthyOrigins: NewHealthyOrigins(file.origin),
+	}
+
+	cfg.mainWg.Add(len(file.origin))
+
+	managers := make([]OriginManager, 0, len(file.origin))
+
+	for _, origin := range file.origin {
+		ctx, cancel := context.WithCancel(context.Background())
+		manager := OriginManager{
+			origin: origin,
+			wg:     &sync.WaitGroup{},
+			cfg:    &cfg,
+			ctx:    ctx,
+			cancel: cancel,
 		}
+
+		managers = append(managers, manager)
+	}
+
+	nOrigins := len(managers)
+
+	base := totalRequests / nOrigins
+	remainder := totalRequests % nOrigins
+
+	start := 0
+	for i := range managers {
+		count := base
+		if i < remainder {
+			count++
+		}
+		end := start + count
+		if start < end {
+			go managers[i].createRequests(start, end) // [start, end)
+		}
+		start = end
+	}
+	retryWg.Add(1)
+	go retryManager(&cfg, &retryWg)
+
+	rebalanceWg.Add(1)
+	go rebalanceManager(&cfg, &rebalanceWg)
+
+	go func() {
+		cfg.mainWg.Wait()
+		close(rebalanceCh)
+		rebalanceWg.Wait()
+		close(cfg.retryCh)
+		retryWg.Wait()
+		close(resultCh)
+	}()
+
+	//cfg.mainWg.Wait()
+
+	receivedHashes := make([]string, totalRequests)
+
+	for dlResponse := range resultCh {
 		receivedHashes[dlResponse.index] = dlResponse.hash
 	}
 
@@ -389,14 +587,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	var decodedChunks []byte
 	for i, r := range receivedHashes {
 		if r == "" {
-			var wgh sync.WaitGroup
-			tempChan := make(chan *DlResponse)
-			wgh.Add(1)
-			senderIdx := i % len(successfulPeers)
-			sendRequest(successfulPeers[senderIdx], i, &wgh, tempChan)
-			k := <-tempChan
-			receivedHashes[i] = k.hash
-			//panic(fmt.Sprintf("Chunk %d está vazio. próximo chunk: %s", i, receivedHashes[i]))
+			panic(fmt.Sprintf("Chunk %d está vazio. próximo chunk: %s", i, receivedHashes[i]))
 		}
 		dec, err := base64.StdEncoding.DecodeString(r)
 		if err != nil {
