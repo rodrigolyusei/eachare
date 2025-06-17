@@ -22,6 +22,8 @@ import (
 	"eachare/src/peers"
 )
 
+const maxConcurrent = 50
+
 type HealthyOrigins struct {
 	mu      sync.Mutex
 	origins []string
@@ -406,18 +408,27 @@ func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginMan
 func (om *OriginManager) createRequests(initialIndex, finalIndex int) {
 	defer om.cfg.mainWg.Done()
 
+	sem := make(chan struct{}, maxConcurrent)
 	var lastCreatedIndex int
 mainloop:
 	for indexNum := initialIndex; indexNum < finalIndex; indexNum++ {
 		select {
 		case <-om.ctx.Done():
 			lastCreatedIndex = indexNum
-			om.cfg.rebalanceCh <- &ManagerError{lastCreatedIndex: lastCreatedIndex, finalIndex: finalIndex, origin: om.origin}
+			om.cfg.rebalanceCh <- &ManagerError{
+				lastCreatedIndex: lastCreatedIndex,
+				finalIndex:       finalIndex,
+				origin:           om.origin,
+			}
 			om.cfg.healthyOrigins.Remove(om.origin)
 			break mainloop
 		default:
+			sem <- struct{}{}
 			om.wg.Add(1)
-			go requestChunk(om.ctx, om.cancel, om.cfg, om.wg, indexNum, om.origin)
+			go func(index int) {
+				defer func() { <-sem }()
+				requestChunk(om.ctx, om.cancel, om.cfg, om.wg, index, om.origin)
+			}(indexNum)
 		}
 	}
 	om.wg.Wait()
@@ -443,7 +454,7 @@ func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
 
 		newOrigin, err := cfg.healthyOrigins.GetNext()
 		if err != nil {
-			panic(fmt.Sprintf("No healthy peers available to retry chunk %d. Aborting download.", chunkIndex))
+			panic(fmt.Sprintf("No healthy peers available to retry chunk %d. Aborting download. %s", chunkIndex, failedReq.err))
 		}
 
 		retryWg.Add(1)
@@ -467,7 +478,7 @@ func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
 
 		healthyPeers, err := cfg.healthyOrigins.GetAll()
 		if err != nil {
-			panic(fmt.Sprintf("Cannot rebalance chunks: %v. Aborting download.", err))
+			panic(fmt.Sprintf("Cannot rebalance chunks: %v. Aborting download. %d, %d", err, job.lastCreatedIndex, job.finalIndex))
 		}
 
 		peerCount := len(healthyPeers)
