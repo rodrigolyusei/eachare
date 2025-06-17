@@ -2,6 +2,7 @@ package commands
 
 // Pacotes nativos de go e pacotes internos
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"math"
@@ -287,30 +288,49 @@ func (dr DlResponse) String() string {
 	return fmt.Sprintf("index: %d, hash: %s, origin: %s, error: %s", dr.index, dr.hash, dr.origin, errMsg)
 }
 
-// Função para mensagem DL, solicita o download do arquivo escolhido em chunks
-func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int) {
-	logger.Std("\nArquivo escolhido " + file.name + "\n")
+type OriginManagerConfig struct {
+	knownPeers    *peers.SafePeers
+	file          *File
+	senderAddress string
+	chunkSize     int
+	resultCh      chan *DlResponse
+	retryCh       chan *DlResponse
+}
 
-	// Calcula a quantidade de requisições necessárias e cria o canal de respostas
-	totalRequests := int(math.Ceil(float64(file.size) / float64(chunkSize)))
+type OriginManager struct {
+	origin   string
+	requests []func(index int)
+	wg       *sync.WaitGroup
+	cfg      *OriginManagerConfig
+	ctx      *context.Context
+}
 
-	// Função para enviar requisições de download para o chunk especificado
-	sendRequest := func(receiver string, index int, waitgroup *sync.WaitGroup, channel chan *DlResponse) {
-		defer waitgroup.Done()
-		arguments := []string{file.name, strconv.Itoa(chunkSize), strconv.Itoa(index)}
-		sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.DL, Arguments: arguments}
-		conn, err := net.Dial("tcp", receiver)
-		connection.SendMessage(knownPeers, conn, sendMessage, receiver)
+func (om *OriginManager) cancel() {
+	cancel := <-om.cancellationCh
+	if cancel {
+
+	}
+}
+
+func (om *OriginManager) createRequests(initialIndex, finalIndex int) {
+	k := func(index int) {
+		defer om.wg.Done()
+
+		arguments := []string{om.cfg.file.name, strconv.Itoa(om.cfg.chunkSize), strconv.Itoa(index)}
+		sendMessage := message.BaseMessage{Origin: om.cfg.senderAddress, Clock: 0, Type: message.DL, Arguments: arguments}
+
+		conn, err := net.Dial("tcp", om.origin)
+		connection.SendMessage(om.cfg.knownPeers, conn, sendMessage, om.origin)
 		if err != nil {
-			channel <- &DlResponse{index: index, err: err, origin: receiver}
+			om.cfg.retryCh <- &DlResponse{index: index, err: err, origin: om.origin}
 			return
 		}
 		defer conn.Close()
 		conn.SetDeadline(time.Now().Add(2 * time.Second))
 
-		receivedMessage := connection.ReceiveMessage(knownPeers, conn)
+		receivedMessage := connection.ReceiveMessage(om.cfg.knownPeers, conn)
 		if receivedMessage.Origin == "" {
-			channel <- &DlResponse{index: index, err: err, origin: receiver}
+			om.cfg.retryCh <- &DlResponse{index: index, err: err, origin: om.origin}
 			return
 		}
 		logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
@@ -319,11 +339,39 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 
 		receivedIdx, err := strconv.Atoi(receivedMessage.Arguments[2])
 		if err != nil {
-			channel <- &DlResponse{index: index, err: err, origin: receiver}
+			om.cfg.retryCh <- &DlResponse{index: index, err: err, origin: om.origin}
 			return
 		}
-		channel <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: receiver}
+		om.cfg.resultCh <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: om.origin}
 	}
+
+	indexNum := initialIndex
+mainloop:
+	for {
+		select {
+		case <-om.ctx.Done():
+			lastCreatedIndex := indexNum
+			break mainloop
+		default:
+			go k(indexNum)
+			indexNum++
+		}
+	}
+}
+
+// Função para mensagem DL, solicita o download do arquivo escolhido em chunks
+func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int) {
+	logger.Std("\nArquivo escolhido " + file.name + "\n")
+
+	// Calcula a quantidade de requisições necessárias e cria o canal de respostas
+	totalRequests := int(math.Ceil(float64(file.size) / float64(chunkSize)))
+
+	requestsPerOrigin := totalRequests / len(file.origin)
+	for _, origin := range file.origin {
+
+	}
+
+	// Função para enviar requisições de download para o chunk especificado
 
 	// Envia requisições de download para cada chunk do arquivo
 	responses := make(chan *DlResponse, totalRequests)
