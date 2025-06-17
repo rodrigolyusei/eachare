@@ -476,7 +476,8 @@ func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
 
 		retryCounts[chunkIndex]++
 		if retryCounts[chunkIndex] > MAX_RETRIES_PER_CHUNK {
-			panic(fmt.Sprintf("Chunk %d failed more than %d times. Aborting download. Last faling origin: %s", chunkIndex, MAX_RETRIES_PER_CHUNK, failedReq.origin))
+			logger.Debug(fmt.Sprintf("Chunk %d failed more than %d times. Aborting download. Last faling origin: %s", chunkIndex, MAX_RETRIES_PER_CHUNK, failedReq.origin))
+			return
 		}
 
 		newOrigin, err := cfg.healthyOrigins.GetNext()
@@ -514,7 +515,8 @@ func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
 
 		healthyPeers, err := cfg.healthyOrigins.GetAll()
 		if err != nil {
-			panic(fmt.Sprintf("Cannot rebalance chunks: %v. Aborting download. %d, %d", err, job.lastCreatedIndex, job.finalIndex))
+			return
+			//panic(fmt.Sprintf("Cannot rebalance chunks: %v. Aborting download. %d, %d", err, job.lastCreatedIndex, job.finalIndex))
 		}
 
 		peerCount := len(healthyPeers)
@@ -523,15 +525,12 @@ func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
 			sem <- struct{}{}
 			originIdx := counter % peerCount
 			newOrigin := healthyPeers[originIdx]
-			if newOrigin == "" {
-				panic("pq estou escolhendo uma origem nula? eu sou burro?")
-			}
 			rebalanceWg.Add(1)
 			ctx, can := context.WithCancel(context.Background())
 			go func(idx int, origin string, chunkReqCtx context.Context, chunkReqCancel context.CancelFunc) {
 				defer func() {
-					chunkReqCancel() // Ensure this specific chunk's context is cancelled
-					<-sem            // Release the semaphore slot when done
+					chunkReqCancel()
+					<-sem // Release the semaphore slot when done
 				}()
 				requestChunk(chunkReqCtx, chunkReqCancel, cfg, rebalanceWg, idx, origin)
 			}(i, newOrigin, ctx, can)
@@ -627,11 +626,13 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	var decodedChunks []byte
 	for i, r := range receivedHashes {
 		if r == "" {
-			panic(fmt.Sprintf("Chunk %d está vazio. próximo chunk: %s. Total chunks: %d", i, receivedHashes[i+1], totalRequests))
+			logger.Std("Não foi possível fazer o download.")
+			logger.Debug(fmt.Sprintf("Chunk %d está vazio. próximo chunk: %s. Total chunks: %d", i, receivedHashes[i+1], totalRequests))
 		}
 		dec, err := base64.StdEncoding.DecodeString(r)
 		if err != nil {
-			panic(fmt.Sprintf("Erro ao decodificar chunk %d: %v", i, err))
+			logger.Std("Não foi possível fazer o download.")
+			logger.Debug(fmt.Sprintf("Erro ao decodificar chunk %d: %v", i, err))
 		}
 		decodedChunks = append(decodedChunks, dec...)
 	}
