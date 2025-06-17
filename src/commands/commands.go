@@ -4,8 +4,10 @@ package commands
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -19,6 +21,53 @@ import (
 	"eachare/src/message"
 	"eachare/src/peers"
 )
+
+type HealthyOrigins struct {
+	mu      sync.Mutex
+	origins []string
+}
+
+func NewHealthyOrigins(initialOrigins []string) *HealthyOrigins {
+	return &HealthyOrigins{
+		origins: initialOrigins,
+	}
+}
+
+func (h *HealthyOrigins) Remove(originToRemove string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for i, origin := range h.origins {
+		if origin == originToRemove {
+			h.origins = append(h.origins[:i], h.origins[i+1:]...)
+			return
+		}
+	}
+}
+
+func (h *HealthyOrigins) GetNext() (string, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if len(h.origins) == 0 {
+		return "", errors.New("no healthy origins available")
+	}
+
+	randomIndex := rand.Intn(len(h.origins))
+	return h.origins[randomIndex], nil
+}
+
+func (h *HealthyOrigins) GetAll() ([]string, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if len(h.origins) == 0 {
+		return nil, errors.New("no healthy origins available")
+	}
+	listCopy := make([]string, len(h.origins))
+	copy(listCopy, h.origins)
+	return listCopy, nil
+}
 
 // Estrutura para um arquivo do download
 type File struct {
@@ -289,14 +338,15 @@ func (dr DlResponse) String() string {
 }
 
 type OriginManagerConfig struct {
-	knownPeers    *peers.SafePeers
-	file          *File
-	senderAddress string
-	chunkSize     int
-	resultCh      chan *DlResponse
-	retryCh       chan *DlResponse
-	rebalanceCh   chan *ManagerError
-	mainWg        *sync.WaitGroup
+	knownPeers     *peers.SafePeers
+	file           *File
+	senderAddress  string
+	chunkSize      int
+	resultCh       chan *DlResponse
+	retryCh        chan *DlResponse
+	rebalanceCh    chan *ManagerError
+	mainWg         *sync.WaitGroup
+	healthyOrigins *HealthyOrigins
 }
 
 type OriginManager struct {
@@ -313,40 +363,48 @@ type ManagerError struct {
 	origin           string
 }
 
+func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginManagerConfig, wg *sync.WaitGroup, index int, origin string) {
+	defer wg.Done()
+
+	arguments := []string{cfg.file.name, strconv.Itoa(cfg.chunkSize), strconv.Itoa(index)}
+	sendMessage := message.BaseMessage{Origin: cfg.senderAddress, Clock: 0, Type: message.DL, Arguments: arguments}
+
+	dialer := &net.Dialer{}
+	conn, err := dialer.DialContext(ctx, "tcp", origin)
+	connection.SendMessage(cfg.knownPeers, conn, sendMessage, origin)
+	if err != nil {
+		defer cancel()
+		cfg.retryCh <- &DlResponse{index: index, err: err, origin: origin}
+		return
+	}
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(5 * time.Second))
+
+	// Receive the response
+	receivedMessage := connection.ReceiveMessage(cfg.knownPeers, conn)
+	if receivedMessage.Origin == "" {
+		err := fmt.Errorf("empty response from origin %s for chunk %d", origin, index)
+		cfg.retryCh <- &DlResponse{index: index, err: err, origin: origin}
+		defer cancel()
+		return
+	}
+
+	logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
+	clock.UpdateMaxClock(receivedMessage.Clock)
+	logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
+
+	receivedIdx, err := strconv.Atoi(receivedMessage.Arguments[2])
+	if err != nil {
+		defer cancel()
+		cfg.retryCh <- &DlResponse{index: index, err: err, origin: origin}
+		return
+	}
+
+	cfg.resultCh <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: receivedMessage.Origin}
+}
+
 func (om *OriginManager) createRequests(initialIndex, finalIndex int) {
 	defer om.cfg.mainWg.Done()
-	k := func(index int) {
-		defer om.wg.Done()
-
-		arguments := []string{om.cfg.file.name, strconv.Itoa(om.cfg.chunkSize), strconv.Itoa(index)}
-		sendMessage := message.BaseMessage{Origin: om.cfg.senderAddress, Clock: 0, Type: message.DL, Arguments: arguments}
-
-		dialer := &net.Dialer{}
-		conn, err := dialer.DialContext(om.ctx, "tcp", om.origin)
-		connection.SendMessage(om.cfg.knownPeers, conn, sendMessage, om.origin)
-		if err != nil {
-			om.cfg.retryCh <- &DlResponse{index: index, err: err, origin: om.origin}
-			return
-		}
-		defer conn.Close()
-		conn.SetDeadline(time.Now().Add(2 * time.Second))
-
-		receivedMessage := connection.ReceiveMessage(om.cfg.knownPeers, conn)
-		if receivedMessage.Origin == "" {
-			om.cfg.retryCh <- &DlResponse{index: index, err: err, origin: om.origin}
-			return
-		}
-		logger.Info("Resposta recebida: \"" + receivedMessage.String() + "\"")
-		clock.UpdateMaxClock(receivedMessage.Clock)
-		logger.Info("Atualizando peer " + receivedMessage.Origin + " status " + peers.ONLINE.String())
-
-		receivedIdx, err := strconv.Atoi(receivedMessage.Arguments[2])
-		if err != nil {
-			om.cfg.retryCh <- &DlResponse{index: index, err: err, origin: om.origin}
-			return
-		}
-		om.cfg.resultCh <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: om.origin}
-	}
 
 	var lastCreatedIndex int
 mainloop:
@@ -355,13 +413,80 @@ mainloop:
 		case <-om.ctx.Done():
 			lastCreatedIndex = indexNum
 			om.cfg.rebalanceCh <- &ManagerError{lastCreatedIndex: lastCreatedIndex, finalIndex: finalIndex, origin: om.origin}
+			om.cfg.healthyOrigins.Remove(om.origin)
 			break mainloop
 		default:
 			om.wg.Add(1)
-			go k(indexNum)
+			go requestChunk(om.ctx, om.cancel, om.cfg, om.wg, indexNum, om.origin)
 		}
 	}
 	om.wg.Wait()
+}
+
+const MAX_RETRIES_PER_CHUNK = 3
+
+func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
+	defer retryWg.Done()
+
+	retryCounts := make(map[int]int)
+
+	for failedReq := range cfg.retryCh {
+		chunkIndex := failedReq.index
+		failedOrigin := failedReq.origin
+
+		cfg.healthyOrigins.Remove(failedOrigin)
+
+		retryCounts[chunkIndex]++
+		if retryCounts[chunkIndex] > MAX_RETRIES_PER_CHUNK {
+			panic(fmt.Sprintf("Chunk %d failed more than %d times. Aborting download.", chunkIndex, MAX_RETRIES_PER_CHUNK))
+		}
+
+		newOrigin, err := cfg.healthyOrigins.GetNext()
+		if err != nil {
+			panic(fmt.Sprintf("No healthy peers available to retry chunk %d. Aborting download.", chunkIndex))
+		}
+
+		retryWg.Add(1)
+		ctx, cancel := context.WithCancel(context.Background())
+		go requestChunk(ctx, cancel, cfg, retryWg, chunkIndex, newOrigin)
+	}
+}
+
+func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
+	defer rebalanceWg.Done()
+
+	for job := range cfg.rebalanceCh {
+		chunksToRebalance := make([]int, 0, job.finalIndex-job.lastCreatedIndex)
+		for i := job.lastCreatedIndex; i < job.finalIndex; i++ {
+			chunksToRebalance = append(chunksToRebalance, i)
+		}
+
+		if len(chunksToRebalance) == 0 {
+			continue
+		}
+
+		healthyPeers, err := cfg.healthyOrigins.GetAll()
+		if err != nil {
+			panic(fmt.Sprintf("Cannot rebalance chunks: %v. Aborting download.", err))
+		}
+
+		peerCount := len(healthyPeers)
+		for i, chunkIndex := range chunksToRebalance {
+			peerIndex := i % peerCount
+			newOrigin := healthyPeers[peerIndex]
+
+			rebalanceWg.Add(1)
+			context, cancel := context.WithCancel(context.Background())
+			go requestChunk(
+				context,
+				cancel,
+				cfg,
+				rebalanceWg,
+				chunkIndex,
+				newOrigin,
+			)
+		}
+	}
 }
 
 // Função para mensagem DL, solicita o download do arquivo escolhido em chunks
@@ -375,15 +500,19 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	retryCh := make(chan *DlResponse, totalRequests)
 	rebalanceCh := make(chan *ManagerError, len(file.origin))
 
+	var retryWg sync.WaitGroup
+	var rebalanceWg sync.WaitGroup
+
 	cfg := OriginManagerConfig{
-		knownPeers:    knownPeers,
-		file:          &file,
-		senderAddress: senderAddress,
-		chunkSize:     chunkSize,
-		resultCh:      resultCh,
-		retryCh:       retryCh,
-		rebalanceCh:   rebalanceCh,
-		mainWg:        &sync.WaitGroup{},
+		knownPeers:     knownPeers,
+		file:           &file,
+		senderAddress:  senderAddress,
+		chunkSize:      chunkSize,
+		resultCh:       resultCh,
+		retryCh:        retryCh,
+		rebalanceCh:    rebalanceCh,
+		mainWg:         &sync.WaitGroup{},
+		healthyOrigins: NewHealthyOrigins(file.origin),
 	}
 
 	cfg.mainWg.Add(len(file.origin))
@@ -420,14 +549,22 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 		}
 		start = end
 	}
+	retryWg.Add(1)
+	go retryManager(&cfg, &retryWg)
+
+	rebalanceWg.Add(1)
+	go rebalanceManager(&cfg, &rebalanceWg)
+
 	go func() {
 		cfg.mainWg.Wait()
-		close(resultCh)
-		close(retryCh)
 		close(rebalanceCh)
+		rebalanceWg.Wait()
+		close(cfg.retryCh)
+		retryWg.Wait()
+		close(resultCh)
 	}()
 
-	cfg.mainWg.Wait()
+	//cfg.mainWg.Wait()
 
 	receivedHashes := make([]string, totalRequests)
 
