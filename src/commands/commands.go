@@ -380,7 +380,7 @@ func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginMan
 		return
 	}
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(5 * time.Second))
+	conn.SetDeadline(time.Now().Add(10 * time.Second))
 
 	// Receive the response
 	receivedMessage := connection.ReceiveMessage(cfg.knownPeers, conn)
