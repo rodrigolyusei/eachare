@@ -293,9 +293,9 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 
 	// Chama a função para download apenas se havia arquivos disponíveis na busca
 	if noPeers {
-		logger.Std("\nNão havia nenhum peer online na busca\n")
+		logger.Std("Não havia nenhum peer online na busca\n")
 	} else if files.Empty() {
-		logger.Std("\nNão havia nenhum arquivo disponível na busca\n")
+		logger.Std("Não havia nenhum arquivo disponível na busca\n")
 	} else {
 		DlMenu(knownPeers, senderAddress, sharedPath, files, chunkSize, statistics)
 	}
@@ -700,7 +700,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 		return err
 	}
 	logger.Std("\nDownload do arquivo " + file.name + " finalizado.\n")
-	logger.Std("\nErros de peer: " + cfg.healthyOrigins.ErrorSummary())
+	//logger.Std("\nErros de peer: " + cfg.healthyOrigins.ErrorSummary())
 	return nil
 }
 
@@ -750,7 +750,7 @@ func ShowStatistics(statistics *[]Statistic) {
 // Função para alterar o tamanho do chunk
 func ChangeChunk(chunkSize *int) {
 	var chunk string
-	logger.Std("\nDigite novo tamanho de chunk:\n> ")
+	logger.Std("Digite novo tamanho de chunk:\n> ")
 	for {
 		fmt.Scanln(&chunk)
 		number, err := strconv.Atoi(chunk)
