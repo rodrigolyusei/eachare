@@ -21,15 +21,17 @@ import (
 	"eachare/src/response"
 )
 
+// Estrutura do peer próprio
 type Client struct {
-	address    string           // Endereço do peer
-	neighbors  string           // Vizinhos do peer
-	shared     string           // Diretório compartilhado do peer
-	knownPeers *peers.SafePeers // Lista dos peers conhecidos seguro para concorrência
-	waitingCli bool             // Variável para controlar o estado do CLI
-	chunkSize  int              // Tamanho do chunk
+	address    string
+	neighbors  string
+	shared     string
+	knownPeers *peers.SafePeers
+	waitingCli bool
+	chunkSize  int
 }
 
+// Função para instanciar o cliente
 func NewClient(address string, neighbors string, shared string) Client {
 	return Client{
 		address:    address,
@@ -132,7 +134,7 @@ func (c *Client) verifySharedDirectory() {
 }
 
 // Função para a CLI/menu de interação com o usuário
-func cliInterface(client *Client) {
+func cliInterface(client *Client, statistics *[]commands.Statistic) {
 	// Declara variável para o comando e saída, depois inicia o loop do menu
 	var comm string
 	var exit bool = false
@@ -163,9 +165,9 @@ func cliInterface(client *Client) {
 		case "3":
 			commands.ListLocalFiles(client.shared)
 		case "4":
-			commands.LsRequest(client.knownPeers, client.address, client.shared, client.chunkSize)
+			commands.LsRequest(client.knownPeers, client.address, client.shared, client.chunkSize, statistics)
 		case "5":
-			logger.Std("Comando ainda não implementado.\n")
+			commands.ShowStatistics(statistics)
 		case "6":
 			commands.ChangeChunk(&client.chunkSize)
 		case "9":
@@ -247,25 +249,20 @@ func receiver(conn net.Conn, client *Client) {
 
 // Função principal do programa
 func main() {
-	// Verifica se o programa está sendo executado em modo de teste ou não
+	// Cria os valores iniciais do cliente a partir dos argumentos de entrada ou do modo de teste
 	var client *Client
-
 	if len(os.Args) == 2 && os.Args[1] == "--test" {
-		// Cria os argumentos de teste
 		client = testArgs()
 	} else {
-		// Pega os argumentos de entrada
 		client = getArgs(os.Args)
-
-		// Adiciona os vizinhos conhecidos no arquivo de vizinhos
 		client.addNeighbors()
+		client.verifySharedDirectory()
 	}
 
-	// Verifica o diretório compartilhado
-	client.verifySharedDirectory()
+	var statistics []commands.Statistic
 
 	// Cria uma goroutine/thread para a CLI
-	go cliInterface(client)
+	go cliInterface(client, &statistics)
 
 	// Inicializa o peer
 	listener(client)
