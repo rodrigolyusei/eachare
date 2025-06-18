@@ -1,8 +1,12 @@
 package commands
 
-// Pacotes nativos de go e pacotes internos
 import (
 	"context"
+	"eachare/src/clock"
+	"eachare/src/connection"
+	"eachare/src/logger"
+	"eachare/src/message"
+	"eachare/src/peers" // Pacotes nativos de go e pacotes internos
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -10,41 +14,64 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"eachare/src/clock"
-	"eachare/src/connection"
-	"eachare/src/logger"
-	"eachare/src/message"
-	"eachare/src/peers"
 )
 
 const maxConcurrent = 50
+const maxFailuresPerOrigin = 15
 
 type HealthyOrigins struct {
-	mu      sync.Mutex
-	origins []string
+	mu         sync.Mutex
+	origins    []string
+	failCounts map[string]int
 }
 
 func NewHealthyOrigins(initialOrigins []string) *HealthyOrigins {
 	return &HealthyOrigins{
-		origins: initialOrigins,
+		origins:    initialOrigins,
+		failCounts: make(map[string]int),
 	}
 }
 
 func (h *HealthyOrigins) Remove(originToRemove string) {
+	if originToRemove == "" {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.failCounts[originToRemove]++
+	if h.failCounts[originToRemove] >= maxFailuresPerOrigin {
+		// remove origin from h.origins
+		for i, origin := range h.origins {
+			if origin == originToRemove {
+				h.origins = slices.Delete(h.origins, i, i+1)
+				return
+			}
+		}
+	}
+}
+
+func (h *HealthyOrigins) ErrorSummary() string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	for i, origin := range h.origins {
-		if origin == originToRemove {
-			h.origins = append(h.origins[:i], h.origins[i+1:]...)
-			return
-		}
+	var sb strings.Builder
+	for origin, count := range h.failCounts {
+		sb.WriteString(fmt.Sprintf("Origin %s: %d errors\n", origin, count))
 	}
+	return sb.String()
+}
+
+func (h *HealthyOrigins) UnsafeErrorSummary() string {
+	var sb strings.Builder
+	for origin, count := range h.failCounts {
+		sb.WriteString(fmt.Sprintf("Origin %s: %d errors\n", origin, count))
+	}
+	return sb.String()
 }
 
 func (h *HealthyOrigins) GetNext() (string, error) {
@@ -52,7 +79,7 @@ func (h *HealthyOrigins) GetNext() (string, error) {
 	defer h.mu.Unlock()
 
 	if len(h.origins) == 0 {
-		return "", errors.New("no healthy origins available")
+		return "", errors.New("não era pra dar errado: " + h.UnsafeErrorSummary())
 	}
 
 	randomIndex := rand.Intn(len(h.origins))
@@ -434,7 +461,7 @@ mainloop:
 	om.wg.Wait()
 }
 
-const MAX_RETRIES_PER_CHUNK = 3
+const MAX_RETRIES_PER_CHUNK = 15
 
 func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
 	defer retryWg.Done()
@@ -449,12 +476,20 @@ func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
 
 		retryCounts[chunkIndex]++
 		if retryCounts[chunkIndex] > MAX_RETRIES_PER_CHUNK {
-			panic(fmt.Sprintf("Chunk %d failed more than %d times. Aborting download.", chunkIndex, MAX_RETRIES_PER_CHUNK))
+			logger.Debug(fmt.Sprintf("Chunk %d failed more than %d times. Aborting download. Last faling origin: %s", chunkIndex, MAX_RETRIES_PER_CHUNK, failedReq.origin))
+			return
 		}
 
 		newOrigin, err := cfg.healthyOrigins.GetNext()
 		if err != nil {
-			panic(fmt.Sprintf("No healthy peers available to retry chunk %d. Aborting download. %s", chunkIndex, failedReq.err))
+			// if failedReq.origin == "" {
+			// 	panic("Origem está nula!!!!!!")
+			// }
+			go func(resp *DlResponse) {
+				time.Sleep(time.Second) // Optional backoff
+				cfg.retryCh <- resp
+			}(failedReq)
+			//panic(fmt.Sprintf("No healthy peers available to retry chunk %d. Aborting download. %s", chunkIndex, failedReq.err))
 		}
 
 		retryWg.Add(1)
@@ -465,6 +500,8 @@ func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
 
 func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
 	defer rebalanceWg.Done()
+
+	sem := make(chan struct{}, maxConcurrent)
 
 	for job := range cfg.rebalanceCh {
 		chunksToRebalance := make([]int, 0, job.finalIndex-job.lastCreatedIndex)
@@ -478,24 +515,26 @@ func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
 
 		healthyPeers, err := cfg.healthyOrigins.GetAll()
 		if err != nil {
-			panic(fmt.Sprintf("Cannot rebalance chunks: %v. Aborting download. %d, %d", err, job.lastCreatedIndex, job.finalIndex))
+			return
+			//panic(fmt.Sprintf("Cannot rebalance chunks: %v. Aborting download. %d, %d", err, job.lastCreatedIndex, job.finalIndex))
 		}
 
 		peerCount := len(healthyPeers)
-		for i, chunkIndex := range chunksToRebalance {
-			peerIndex := i % peerCount
-			newOrigin := healthyPeers[peerIndex]
-
+		counter := 0
+		for i := job.lastCreatedIndex; i < job.finalIndex; i++ {
+			sem <- struct{}{}
+			originIdx := counter % peerCount
+			newOrigin := healthyPeers[originIdx]
 			rebalanceWg.Add(1)
-			context, cancel := context.WithCancel(context.Background())
-			go requestChunk(
-				context,
-				cancel,
-				cfg,
-				rebalanceWg,
-				chunkIndex,
-				newOrigin,
-			)
+			ctx, can := context.WithCancel(context.Background())
+			go func(idx int, origin string, chunkReqCtx context.Context, chunkReqCancel context.CancelFunc) {
+				defer func() {
+					chunkReqCancel()
+					<-sem // Release the semaphore slot when done
+				}()
+				requestChunk(chunkReqCtx, chunkReqCancel, cfg, rebalanceWg, idx, origin)
+			}(i, newOrigin, ctx, can)
+			counter++
 		}
 	}
 }
@@ -587,11 +626,13 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	var decodedChunks []byte
 	for i, r := range receivedHashes {
 		if r == "" {
-			panic(fmt.Sprintf("Chunk %d está vazio. próximo chunk: %s", i, receivedHashes[i]))
+			logger.Std("Não foi possível fazer o download.")
+			logger.Debug(fmt.Sprintf("Chunk %d está vazio. próximo chunk: %s. Total chunks: %d", i, receivedHashes[i+1], totalRequests))
 		}
 		dec, err := base64.StdEncoding.DecodeString(r)
 		if err != nil {
-			panic(fmt.Sprintf("Erro ao decodificar chunk %d: %v", i, err))
+			logger.Std("Não foi possível fazer o download.")
+			logger.Debug(fmt.Sprintf("Erro ao decodificar chunk %d: %v", i, err))
 		}
 		decodedChunks = append(decodedChunks, dec...)
 	}
@@ -603,6 +644,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	_, err = createdFile.Write(decodedChunks)
 	check(err)
 	logger.Std("\nDownload do arquivo " + file.name + " finalizado.\n")
+	logger.Std("\nErros de peer: " + cfg.healthyOrigins.ErrorSummary())
 }
 
 // Função para alterar o tamanho do chunk
