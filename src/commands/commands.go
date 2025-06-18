@@ -1,6 +1,8 @@
 package commands
 
+// Pacotes nativos de go e pacotes internos
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -14,12 +16,11 @@ import (
 	"sync"
 	"time"
 
-	"context"
 	"eachare/src/clock"
 	"eachare/src/connection"
 	"eachare/src/logger"
 	"eachare/src/message"
-	"eachare/src/peers" // Pacotes nativos de go e pacotes internos
+	"eachare/src/peers"
 )
 
 const MAX_CONCURRENT_PER_MANAGER = 50
@@ -161,8 +162,6 @@ func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
 		// Imprime o menu de opções
 		logger.Std("Lista de peers:\n")
 		logger.Std("\t[0] voltar para o menu anterior\n")
-
-		// Lista os peers e cria uma lista dos endereços para enviar o HELLO
 		var addrList []string
 		for i, peer := range knownPeers.GetAll() {
 			addrList = append(addrList, peer.Address)
@@ -172,19 +171,16 @@ func ListPeers(knownPeers *peers.SafePeers, senderAddress string) {
 		// Lê a entrada do usuário
 		logger.Std("> ")
 		fmt.Scanln(&comm)
-
-		// Converte a entrada para inteiro
 		number, err := strconv.Atoi(comm)
 		if err != nil {
 			logger.Std("\nOpção inválida, tente novamente.\n\n")
 			continue
 		}
 
-		// Envio de mensagem para o destino escolhido
+		// Envia HELLO para o destino escolhido
 		if number == 0 {
 			break
 		} else if number > 0 && number <= len(addrList) {
-			// Imprime uma quebra de linha
 			logger.Std("\n")
 
 			// Cria e envia a mensagem HELLO para o peer escolhido
@@ -251,31 +247,10 @@ func GetPeersRequest(knownPeers *peers.SafePeers, senderAddress string) {
 
 // Função para listar os arquivos do diretório compartilhado
 func ListLocalFiles(sharedPath string) {
-	// Lê o diretório e imprime os arquivos
 	entries, err := os.ReadDir(sharedPath)
 	check(err)
 	for _, entry := range entries {
 		logger.Std("\t" + entry.Name() + "\n")
-	}
-}
-
-// Função para mensagem BYE, avisando os peers sobre a saída
-func ByeRequest(knownPeers *peers.SafePeers, senderAddress string) {
-	// Imprime mensagem de saída e cria a mensagem BYE
-	logger.Std("Saindo...\n")
-	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.BYE, Arguments: nil}
-
-	// Envia mensagem BYE para cada peer conhecido
-	for _, peer := range knownPeers.GetAll() {
-		if !peer.Status {
-			continue
-		}
-		conn, _ := net.Dial("tcp", peer.Address)
-		connection.SendMessage(knownPeers, conn, sendMessage, peer.Address)
-		if conn != nil {
-			defer conn.Close()
-			conn.SetDeadline(time.Now().Add(2 * time.Second))
-		}
 	}
 }
 
@@ -332,27 +307,25 @@ func DlMenu(knownPeers *peers.SafePeers, senderAddress string, sharedPath string
 	var comm string
 	for {
 		// Encontra o nome e o tamanho com maior quantidade de caracteres
-		maxName := len("<Cancelar>")
-		maxSize := len("Tamanho")
+		biggestName := len("<Cancelar>")
+		biggestSize := len("Tamanho")
 		for _, file := range fileList.files {
-			if len(file.name) > maxName {
-				maxName = len(file.name)
+			if len(file.name) > biggestName {
+				biggestName = len(file.name)
 			}
-			if len(strconv.Itoa(file.size)) > maxSize {
-				maxSize = len(strconv.Itoa(file.size))
+			if len(strconv.Itoa(file.size)) > biggestSize {
+				biggestSize = len(strconv.Itoa(file.size))
 			}
 		}
 
 		// Formata o menu de opções
-		header := fmt.Sprintf("\t     %%-%ds | %%-%ds | %%s\n", maxName, maxSize)
-		row := fmt.Sprintf("\t[%%2d] %%-%ds | %%-%ds | %%s\n", maxName, maxSize)
+		header := fmt.Sprintf("\t     %%-%ds | %%-%ds | %%s\n", biggestName, biggestSize)
+		row := fmt.Sprintf("\t[%%2d] %%-%ds | %%-%ds | %%s\n", biggestName, biggestSize)
 
 		// Imprime o menu de opções
 		logger.Std("\nArquivos encontrados na rede:\n")
 		logger.Std(fmt.Sprintf(header, "Nome", "Tamanho", "Peer"))
 		logger.Std(fmt.Sprintf(row, 0, "<Cancelar>", "", ""))
-
-		// Lista os peers e cria uma lista dos endereços para enviar o HELLO
 		for i, file := range fileList.files {
 			logger.Std(fmt.Sprintf(row, i+1, file.name, strconv.Itoa(file.size), file.OriginsString()))
 		}
@@ -360,8 +333,6 @@ func DlMenu(knownPeers *peers.SafePeers, senderAddress string, sharedPath string
 		// Lê a entrada do usuário
 		logger.Std("\nDigite o numero do arquivo para fazer o download:\n> ")
 		fmt.Scanln(&comm)
-
-		// Converte a entrada para inteiro
 		number, err := strconv.Atoi(comm)
 		if err != nil {
 			logger.Std("\nOpção inválida, tente novamente.\n")
@@ -425,17 +396,17 @@ type ManagerError struct {
 func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginManagerConfig, wg *sync.WaitGroup, index int, origin string) {
 	defer wg.Done()
 
-	// constrói a mensagem a ser enviada.
+	// Constrói a mensagem a ser enviada.
 	arguments := []string{cfg.file.name, strconv.Itoa(cfg.chunkSize), strconv.Itoa(index)}
 	sendMessage := message.BaseMessage{Origin: cfg.senderAddress, Clock: 0, Type: message.DL, Arguments: arguments}
 
-	// nessa mensagem em específico, enviamos com o contexto. Se ele for cancelado, as mensagens
-	// param de ser enviadas mais rapidamente.
+	// Nessa mensagem em específico, enviamos com o contexto. Se ele for cancelado, as mensagens
+	// Param de ser enviadas mais rapidamente.
 	dialer := &net.Dialer{}
 	conn, err := dialer.DialContext(ctx, "tcp", origin)
 	connection.SendMessage(cfg.knownPeers, conn, sendMessage, origin)
 	if err != nil {
-		// se há algum erro, enviamos para o retry e matamos o manager que chamou esse requestChunk.
+		// Se há algum erro, enviamos para o retry e matamos o manager que chamou esse requestChunk.
 		// Isso vale para todos os erros dessa função.
 		defer cancel()
 		cfg.retryCh <- &DlResponse{index: index, err: err, origin: origin}
@@ -463,7 +434,7 @@ func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginMan
 		return
 	}
 
-	// envia o resultado de sucesso para o canal de resultados.
+	// Envia o resultado de sucesso para o canal de resultados.
 	cfg.resultCh <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: receivedMessage.Origin}
 }
 
@@ -471,18 +442,17 @@ func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginMan
 func (om *OriginManager) createRequests(initialIndex, finalIndex int) {
 	defer om.cfg.mainWg.Done()
 
-	// semáforo para limitar a quantidade de requisições enviadas.
+	// Semáforo para limitar a quantidade de requisições enviadas.
 	sem := make(chan struct{}, MAX_CONCURRENT_PER_MANAGER)
 
 	var lastCreatedIndex int
-	// o loop está nomeado para caso haja alguma falha seja fácil de sair dele.
+	// O loop está nomeado para caso haja alguma falha seja fácil de sair dele.
 mainloop:
 	for indexNum := initialIndex; indexNum < finalIndex; indexNum++ {
-
 		// select está checando sempre se houve alguma falha.
 		select {
 		case <-om.ctx.Done():
-			// caso haja alguma falha, envia o último index enviado e o final para o rebalance.
+			// Caso haja alguma falha, envia o último index enviado e o final para o rebalance.
 			lastCreatedIndex = indexNum
 			om.cfg.rebalanceCh <- &ManagerError{
 				lastCreatedIndex: lastCreatedIndex,
@@ -494,28 +464,29 @@ mainloop:
 		default:
 			sem <- struct{}{} // adiciona +1 no semáforo.
 			om.wg.Add(1)      // adiciona +1 no waitgroup.
-			// goroutine que envia a requisição de determinado index.
+			// Goroutine que envia a requisição de determinado index.
 			go func(index int) {
 				defer func() { <-sem }() // essa função libera o semáforo no fim da execução da request.
 				requestChunk(om.ctx, om.cancel, om.cfg, om.wg, index, om.origin)
 			}(indexNum)
 		}
 	}
-	om.wg.Wait() // espera com que todas as requisições terminem.
+	// Espera todas as requisições terminem.
+	om.wg.Wait()
 }
 
 // Goroutine responsável para executar retries em peers que ainda estão vivos.
 func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
 	defer retryWg.Done()
 
-	// conta quantas vezes um peer falhou.
+	// Conta quantas vezes um peer falhou.
 	retryCounts := make(map[int]int)
 
 	for failedReq := range cfg.retryCh {
 		chunkIndex := failedReq.index
 		failedOrigin := failedReq.origin
 
-		// tenta remover a origem.
+		// Tenta remover a origem.
 		cfg.healthyOrigins.Remove(failedOrigin)
 
 		// Se um chunk falha MAX_RETRIES_PER_CHUNK, o download é cancelado.
@@ -525,9 +496,9 @@ func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
 			return
 		}
 
-		newOrigin, err := cfg.healthyOrigins.GetNext() // escolhemos uma origem aleatória.
+		newOrigin, err := cfg.healthyOrigins.GetNext() // Escolhemos uma origem aleatória.
 		if err != nil {
-			// essa função adiciona um tempo antes de reenviar a requisição para o retry.
+			// Função que adiciona um tempo antes de reenviar a requisição para o retry.
 			go func(resp *DlResponse) {
 				time.Sleep(time.Second)
 				cfg.retryCh <- resp
@@ -549,7 +520,6 @@ func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
 	sem := make(chan struct{}, MAX_CONCURRENT_PER_MANAGER)
 
 	for job := range cfg.rebalanceCh {
-
 		if job.lastCreatedIndex-job.finalIndex == 0 {
 			continue
 		}
@@ -598,7 +568,6 @@ func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
 // número de falhas. Caso todos os peers morram durante o download, ele é cancelado.
 func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int, statistics *[]Statistic) error {
 	logger.Std("\nArquivo escolhido " + file.name + "\n")
-
 	startTime := time.Now()
 
 	// Calcula a quantidade de requisições necessárias e cria o canal de respostas
@@ -637,7 +606,6 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 			ctx:    ctx,
 			cancel: cancel,
 		}
-
 		managers = append(managers, manager)
 	}
 
@@ -647,7 +615,6 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	// A partir daqui ocorre a lógica de distribuição inicial das requisições entre os peers.
 	base := totalRequests / nManagers
 	remainder := totalRequests % nManagers
-
 	start := 0
 	for i := range managers {
 		count := base
@@ -656,7 +623,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 		}
 		end := start + count
 		if start < end {
-			go managers[i].createRequests(start, end) // [start, end)
+			go managers[i].createRequests(start, end)
 		}
 		start = end
 	}
@@ -664,15 +631,13 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	// Iniciando goroutines responsáveis para resiliência
 	retryWg.Add(1)
 	go retryManager(&cfg, &retryWg)
-
 	rebalanceWg.Add(1)
 	go rebalanceManager(&cfg, &rebalanceWg)
 
 	// Rotina para fechar os canais de comunicação na ordem correta.
-	// Primeiro, esperamos os Managers terminarem. Depois, fechamos o
-	// canal de rebalanceamento e esperamos todas as operações do rebalanceManager
-	// terminarem. Por fim, fechamos o canal de retry e esperamos todas as chamadas de retry
-	// restantes terminarem e fechamos o canal de resultados.
+	// Primeiro, esperamos os Managers terminarem.
+	// Depois, fechamos o canal de rebalanceamento e esperamos todas as operações do rebalanceManager terminarem.
+	// Por fim, fechamos o canal de retry e esperamos todas as chamadas de retry restantes terminarem e fechamos o canal de resultados.
 	go func() {
 		cfg.mainWg.Wait()
 		close(rebalanceCh)
@@ -682,11 +647,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 		close(resultCh)
 	}()
 
-	//cfg.mainWg.Wait()
-	// Essa espera não precisa acontecer. Como fechamos o canal result somente no final
-	// da operação, é possível continuar a thread principal em paralelo.
-
-	// array para guardar os hashs recebidos.
+	// Array para guardar os hashs recebidos.
 	receivedHashes := make([]string, totalRequests)
 
 	// Nesse loop, como iteramos em cima de um go channel, ele espera mensagens chegarem nele até que o canal se feche.
@@ -712,7 +673,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 			times:      []float64{finalTime},
 		})
 	}
-  
+
 	// Loop em que decodificamos os hashs recebidos e tratamos erros
 	var decodedChunks []byte
 	for i, r := range receivedHashes {
@@ -799,5 +760,25 @@ func ChangeChunk(chunkSize *int) {
 			return
 		}
 		logger.Std("\nValor inválido. Precisa ser um inteiro maior que 0.\n> ")
+	}
+}
+
+// Função para mensagem BYE, avisando os peers sobre a saída
+func ByeRequest(knownPeers *peers.SafePeers, senderAddress string) {
+	// Imprime mensagem de saída e cria a mensagem BYE
+	logger.Std("Saindo...\n")
+	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.BYE, Arguments: nil}
+
+	// Envia mensagem BYE para cada peer conhecido
+	for _, peer := range knownPeers.GetAll() {
+		if !peer.Status {
+			continue
+		}
+		conn, _ := net.Dial("tcp", peer.Address)
+		connection.SendMessage(knownPeers, conn, sendMessage, peer.Address)
+		if conn != nil {
+			defer conn.Close()
+			conn.SetDeadline(time.Now().Add(2 * time.Second))
+		}
 	}
 }
