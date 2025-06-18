@@ -35,6 +35,7 @@ go run ./eachare.go 127.0.0.1:9001 ../data/neighbor1.txt ../data/shared1/
 go run ./eachare.go 127.0.0.1:9002 ../data/neighbor2.txt ../data/shared2/
 go run ./eachare.go 127.0.0.1:9003 ../data/neighbor3.txt ../data/shared3/
 go run ./eachare.go 127.0.0.1:9004 ../data/neighbor4.txt ../data/shared4/
+go run ./eachare.go 127.0.0.1:9005 ../data/neighbor5.txt ../data/shared5/
 ```
 
 ## Testes
