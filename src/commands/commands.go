@@ -1,12 +1,6 @@
 package commands
 
 import (
-	"context"
-	"eachare/src/clock"
-	"eachare/src/connection"
-	"eachare/src/logger"
-	"eachare/src/message"
-	"eachare/src/peers" // Pacotes nativos de go e pacotes internos
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -19,10 +13,18 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"context"
+	"eachare/src/clock"
+	"eachare/src/connection"
+	"eachare/src/logger"
+	"eachare/src/message"
+	"eachare/src/peers" // Pacotes nativos de go e pacotes internos
 )
 
-const maxConcurrent = 50
-const maxFailuresPerOrigin = 15
+const MAX_CONCURRENT_PER_MANAGER = 50
+const MAX_FAILURES_PER_ORIGIN = 15
+const MAX_RETRIES_PER_CHUNK = 15
 
 type HealthyOrigins struct {
 	mu         sync.Mutex
@@ -44,7 +46,7 @@ func (h *HealthyOrigins) Remove(originToRemove string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.failCounts[originToRemove]++
-	if h.failCounts[originToRemove] >= maxFailuresPerOrigin {
+	if h.failCounts[originToRemove] >= MAX_FAILURES_PER_ORIGIN {
 		// remove origin from h.origins
 		for i, origin := range h.origins {
 			if origin == originToRemove {
@@ -257,6 +259,26 @@ func ListLocalFiles(sharedPath string) {
 	}
 }
 
+// Função para mensagem BYE, avisando os peers sobre a saída
+func ByeRequest(knownPeers *peers.SafePeers, senderAddress string) {
+	// Imprime mensagem de saída e cria a mensagem BYE
+	logger.Std("Saindo...\n")
+	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.BYE, Arguments: nil}
+
+	// Envia mensagem BYE para cada peer conhecido
+	for _, peer := range knownPeers.GetAll() {
+		if !peer.Status {
+			continue
+		}
+		conn, _ := net.Dial("tcp", peer.Address)
+		connection.SendMessage(knownPeers, conn, sendMessage, peer.Address)
+		if conn != nil {
+			defer conn.Close()
+			conn.SetDeadline(time.Now().Add(2 * time.Second))
+		}
+	}
+}
+
 // Função para mensagem LS, solicita para os vizinhos onlines os seus arquivos
 func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, chunkSize int, statistics *[]Statistic) {
 	// Cria a estrutura da mensagem LS
@@ -403,13 +425,18 @@ type ManagerError struct {
 func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginManagerConfig, wg *sync.WaitGroup, index int, origin string) {
 	defer wg.Done()
 
+	// constrói a mensagem a ser enviada.
 	arguments := []string{cfg.file.name, strconv.Itoa(cfg.chunkSize), strconv.Itoa(index)}
 	sendMessage := message.BaseMessage{Origin: cfg.senderAddress, Clock: 0, Type: message.DL, Arguments: arguments}
 
+	// nessa mensagem em específico, enviamos com o contexto. Se ele for cancelado, as mensagens
+	// param de ser enviadas mais rapidamente.
 	dialer := &net.Dialer{}
 	conn, err := dialer.DialContext(ctx, "tcp", origin)
 	connection.SendMessage(cfg.knownPeers, conn, sendMessage, origin)
 	if err != nil {
+		// se há algum erro, enviamos para o retry e matamos o manager que chamou esse requestChunk.
+		// Isso vale para todos os erros dessa função.
 		defer cancel()
 		cfg.retryCh <- &DlResponse{index: index, err: err, origin: origin}
 		return
@@ -417,7 +444,6 @@ func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginMan
 	defer conn.Close()
 	conn.SetDeadline(time.Now().Add(10 * time.Second))
 
-	// Receive the response
 	receivedMessage := connection.ReceiveMessage(cfg.knownPeers, conn)
 	if receivedMessage.Origin == "" {
 		err := fmt.Errorf("empty response from origin %s for chunk %d", origin, index)
@@ -437,118 +463,140 @@ func requestChunk(ctx context.Context, cancel context.CancelFunc, cfg *OriginMan
 		return
 	}
 
+	// envia o resultado de sucesso para o canal de resultados.
 	cfg.resultCh <- &DlResponse{index: receivedIdx, hash: receivedMessage.Arguments[3], err: nil, origin: receivedMessage.Origin}
 }
 
+// Função principal do manager. Envia requisições considerando um intervalo de índices.
 func (om *OriginManager) createRequests(initialIndex, finalIndex int) {
 	defer om.cfg.mainWg.Done()
 
-	sem := make(chan struct{}, maxConcurrent)
+	// semáforo para limitar a quantidade de requisições enviadas.
+	sem := make(chan struct{}, MAX_CONCURRENT_PER_MANAGER)
+
 	var lastCreatedIndex int
+	// o loop está nomeado para caso haja alguma falha seja fácil de sair dele.
 mainloop:
 	for indexNum := initialIndex; indexNum < finalIndex; indexNum++ {
+
+		// select está checando sempre se houve alguma falha.
 		select {
 		case <-om.ctx.Done():
+			// caso haja alguma falha, envia o último index enviado e o final para o rebalance.
 			lastCreatedIndex = indexNum
 			om.cfg.rebalanceCh <- &ManagerError{
 				lastCreatedIndex: lastCreatedIndex,
 				finalIndex:       finalIndex,
 				origin:           om.origin,
 			}
-			om.cfg.healthyOrigins.Remove(om.origin)
+			om.cfg.healthyOrigins.Remove(om.origin) // remove o peer dos peers saudáveis.
 			break mainloop
 		default:
-			sem <- struct{}{}
-			om.wg.Add(1)
+			sem <- struct{}{} // adiciona +1 no semáforo.
+			om.wg.Add(1)      // adiciona +1 no waitgroup.
+			// goroutine que envia a requisição de determinado index.
 			go func(index int) {
-				defer func() { <-sem }()
+				defer func() { <-sem }() // essa função libera o semáforo no fim da execução da request.
 				requestChunk(om.ctx, om.cancel, om.cfg, om.wg, index, om.origin)
 			}(indexNum)
 		}
 	}
-	om.wg.Wait()
+	om.wg.Wait() // espera com que todas as requisições terminem.
 }
 
-const MAX_RETRIES_PER_CHUNK = 15
-
+// Goroutine responsável para executar retries em peers que ainda estão vivos.
 func retryManager(cfg *OriginManagerConfig, retryWg *sync.WaitGroup) {
 	defer retryWg.Done()
 
+	// conta quantas vezes um peer falhou.
 	retryCounts := make(map[int]int)
 
 	for failedReq := range cfg.retryCh {
 		chunkIndex := failedReq.index
 		failedOrigin := failedReq.origin
 
+		// tenta remover a origem.
 		cfg.healthyOrigins.Remove(failedOrigin)
 
+		// Se um chunk falha MAX_RETRIES_PER_CHUNK, o download é cancelado.
 		retryCounts[chunkIndex]++
 		if retryCounts[chunkIndex] > MAX_RETRIES_PER_CHUNK {
 			logger.Debug(fmt.Sprintf("Chunk %d failed more than %d times. Aborting download. Last faling origin: %s", chunkIndex, MAX_RETRIES_PER_CHUNK, failedReq.origin))
 			return
 		}
 
-		newOrigin, err := cfg.healthyOrigins.GetNext()
+		newOrigin, err := cfg.healthyOrigins.GetNext() // escolhemos uma origem aleatória.
 		if err != nil {
-			// if failedReq.origin == "" {
-			// 	panic("Origem está nula!!!!!!")
-			// }
+			// essa função adiciona um tempo antes de reenviar a requisição para o retry.
 			go func(resp *DlResponse) {
-				time.Sleep(time.Second) // Optional backoff
+				time.Sleep(time.Second)
 				cfg.retryCh <- resp
 			}(failedReq)
-			//panic(fmt.Sprintf("No healthy peers available to retry chunk %d. Aborting download. %s", chunkIndex, failedReq.err))
 		}
 
+		// Aumenta em 1 o WaitGroup e envia reenvia a requisição para determinado chunk.
 		retryWg.Add(1)
 		ctx, cancel := context.WithCancel(context.Background())
 		go requestChunk(ctx, cancel, cfg, retryWg, chunkIndex, newOrigin)
 	}
 }
 
+// Goroutine responsável pelo rebalanceamento das requisições caso um manager falhe.
 func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
 	defer rebalanceWg.Done()
 
-	sem := make(chan struct{}, maxConcurrent)
+	// semáforo para limitar o número de requisições concorrentes enviadas a cada peer.
+	sem := make(chan struct{}, MAX_CONCURRENT_PER_MANAGER)
 
 	for job := range cfg.rebalanceCh {
-		chunksToRebalance := make([]int, 0, job.finalIndex-job.lastCreatedIndex)
-		for i := job.lastCreatedIndex; i < job.finalIndex; i++ {
-			chunksToRebalance = append(chunksToRebalance, i)
-		}
 
-		if len(chunksToRebalance) == 0 {
+		if job.lastCreatedIndex-job.finalIndex == 0 {
 			continue
 		}
 
+		// Caso haja alguma requisição para rebalancear, captura todos os peers ainda saudáveis
 		healthyPeers, err := cfg.healthyOrigins.GetAll()
 		if err != nil {
 			return
-			//panic(fmt.Sprintf("Cannot rebalance chunks: %v. Aborting download. %d, %d", err, job.lastCreatedIndex, job.finalIndex))
 		}
 
 		peerCount := len(healthyPeers)
 		counter := 0
+		// lógica de redistribuição de carga round robin.
 		for i := job.lastCreatedIndex; i < job.finalIndex; i++ {
-			sem <- struct{}{}
+			sem <- struct{}{} // envia uma struct para o semáforo. Se ele estiver cheio, a rotina espera um espaço.
 			originIdx := counter % peerCount
 			newOrigin := healthyPeers[originIdx]
-			rebalanceWg.Add(1)
-			ctx, can := context.WithCancel(context.Background())
-			go func(idx int, origin string, chunkReqCtx context.Context, chunkReqCancel context.CancelFunc) {
+			rebalanceWg.Add(1) // Avisa para o WaitGroup que está chegando mais uma requisição.
+
+			// Função que vai enviar 1 requisição para alguma origem disponível.
+			go func(idx int, origin string) {
+				chunkReqCtx, chunkReqCancel := context.WithCancel(context.Background())
+
+				// Essa função vai ser executada no final da operação da atual goroutine.
+				// Ela finaliza o contexto corretamente e libera um espaço do semáforo, consumindo-o.
 				defer func() {
 					chunkReqCancel()
-					<-sem // Release the semaphore slot when done
+					<-sem
 				}()
+
+				// requisição sendo enviada.
 				requestChunk(chunkReqCtx, chunkReqCancel, cfg, rebalanceWg, idx, origin)
-			}(i, newOrigin, ctx, can)
+			}(i, newOrigin)
+
 			counter++
 		}
 	}
 }
 
-// Função para mensagem DL, solicita o download do arquivo escolhido em chunks
-func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int, statistics *[]Statistic) {
+// Função para mensagem DL, solicita o download do arquivo escolhido em chunks.
+// Funcionamento: criamos 3 tipos de goroutines: n managers, 1 RetryManager e 1 RebalanceManager.
+// Caso uma goroutine manager falhe em alguma requisição, envia a falha para RetryManager, depois
+// é morta e envia as requisições que ainda fez para o RebalanceManager. O RebalanceManager divide
+// todas as requisições de quem teve um erro entre as origens que ainda estão ativas.
+// Para o RebalanceManager e o RetryManager, um peer só é dado como morto mesmo depois de um certo
+// número de falhas. Caso todos os peers morram durante o download, ele é cancelado.
+func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int, statistics *[]Statistic) error {
 	logger.Std("\nArquivo escolhido " + file.name + "\n")
 
 	startTime := time.Now()
@@ -556,13 +604,16 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	// Calcula a quantidade de requisições necessárias e cria o canal de respostas
 	totalRequests := int(math.Ceil(float64(file.size) / float64(chunkSize)))
 
+	// cria os canais de comunicação para o valor resultado retornado, resiliência (retry) e rebalanceamento
 	resultCh := make(chan *DlResponse, totalRequests)
 	retryCh := make(chan *DlResponse, totalRequests)
 	rebalanceCh := make(chan *ManagerError, len(file.origin))
 
+	// grupos de espera para sincronizar chamadas que foram para os canais de resiliência e rebalanceamento
 	var retryWg sync.WaitGroup
 	var rebalanceWg sync.WaitGroup
 
+	// configuração comum para os gerenciadores de origem
 	cfg := OriginManagerConfig{
 		knownPeers:     knownPeers,
 		file:           &file,
@@ -575,10 +626,8 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 		healthyOrigins: NewHealthyOrigins(file.origin),
 	}
 
-	cfg.mainWg.Add(len(file.origin))
-
+	// criamos o array de gerentes e populamos
 	managers := make([]OriginManager, 0, len(file.origin))
-
 	for _, origin := range file.origin {
 		ctx, cancel := context.WithCancel(context.Background())
 		manager := OriginManager{
@@ -592,10 +641,12 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 		managers = append(managers, manager)
 	}
 
-	nOrigins := len(managers)
+	nManagers := len(managers)
+	cfg.mainWg.Add(nManagers)
 
-	base := totalRequests / nOrigins
-	remainder := totalRequests % nOrigins
+	// A partir daqui ocorre a lógica de distribuição inicial das requisições entre os peers.
+	base := totalRequests / nManagers
+	remainder := totalRequests % nManagers
 
 	start := 0
 	for i := range managers {
@@ -609,25 +660,36 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 		}
 		start = end
 	}
+
+	// Iniciando goroutines responsáveis para resiliência
 	retryWg.Add(1)
 	go retryManager(&cfg, &retryWg)
 
 	rebalanceWg.Add(1)
 	go rebalanceManager(&cfg, &rebalanceWg)
 
+	// Rotina para fechar os canais de comunicação na ordem correta.
+	// Primeiro, esperamos os Managers terminarem. Depois, fechamos o
+	// canal de rebalanceamento e esperamos todas as operações do rebalanceManager
+	// terminarem. Por fim, fechamos o canal de retry e esperamos todas as chamadas de retry
+	// restantes terminarem e fechamos o canal de resultados.
 	go func() {
 		cfg.mainWg.Wait()
 		close(rebalanceCh)
 		rebalanceWg.Wait()
-		close(cfg.retryCh)
+		close(cfg.retryCh) // aqui pode ter um bug. O RetryManager em alguns momentos coloca na própria fila, então tem chance de colocar nela já fechada
 		retryWg.Wait()
 		close(resultCh)
 	}()
 
 	//cfg.mainWg.Wait()
+	// Essa espera não precisa acontecer. Como fechamos o canal result somente no final
+	// da operação, é possível continuar a thread principal em paralelo.
 
+	// array para guardar os hashs recebidos.
 	receivedHashes := make([]string, totalRequests)
 
+	// Nesse loop, como iteramos em cima de um go channel, ele espera mensagens chegarem nele até que o canal se feche.
 	for dlResponse := range resultCh {
 		receivedHashes[dlResponse.index] = dlResponse.hash
 	}
@@ -650,30 +712,35 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 			times:      []float64{finalTime},
 		})
 	}
-
-	// Decodifica os chunks recebidos e junta
+  
+	// Loop em que decodificamos os hashs recebidos e tratamos erros
 	var decodedChunks []byte
 	for i, r := range receivedHashes {
 		if r == "" {
 			logger.Std("Não foi possível fazer o download.")
-			logger.Debug(fmt.Sprintf("Chunk %d está vazio. próximo chunk: %s. Total chunks: %d", i, receivedHashes[i+1], totalRequests))
+			return fmt.Errorf("chunk %d está vazio. próximo chunk: %s. Total chunks: %d", i, receivedHashes[i+1], totalRequests)
 		}
 		dec, err := base64.StdEncoding.DecodeString(r)
 		if err != nil {
 			logger.Std("Não foi possível fazer o download.")
-			logger.Debug(fmt.Sprintf("Erro ao decodificar chunk %d: %v", i, err))
+			return fmt.Errorf("erro ao decodificar chunk %d: %v", i, err)
 		}
 		decodedChunks = append(decodedChunks, dec...)
 	}
 
 	// Cria/substitui o arquivo e escreve o conteúdo decodificado
 	createdFile, err := os.Create(sharedPath + file.name)
-	check(err)
+	if err != nil {
+		return err
+	}
 	defer createdFile.Close()
 	_, err = createdFile.Write(decodedChunks)
-	check(err)
+	if err != nil {
+		return err
+	}
 	logger.Std("\nDownload do arquivo " + file.name + " finalizado.\n")
 	logger.Std("\nErros de peer: " + cfg.healthyOrigins.ErrorSummary())
+	return nil
 }
 
 // Função para mostrar as estatísticas do download
@@ -732,25 +799,5 @@ func ChangeChunk(chunkSize *int) {
 			return
 		}
 		logger.Std("\nValor inválido. Precisa ser um inteiro maior que 0.\n> ")
-	}
-}
-
-// Função para mensagem BYE, avisando os peers sobre a saída
-func ByeRequest(knownPeers *peers.SafePeers, senderAddress string) {
-	// Imprime mensagem de saída e cria a mensagem BYE
-	logger.Std("Saindo...\n")
-	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.BYE, Arguments: nil}
-
-	// Envia mensagem BYE para cada peer conhecido
-	for _, peer := range knownPeers.GetAll() {
-		if !peer.Status {
-			continue
-		}
-		conn, _ := net.Dial("tcp", peer.Address)
-		connection.SendMessage(knownPeers, conn, sendMessage, peer.Address)
-		if conn != nil {
-			defer conn.Close()
-			conn.SetDeadline(time.Now().Add(2 * time.Second))
-		}
 	}
 }
