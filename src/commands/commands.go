@@ -23,7 +23,7 @@ import (
 	"eachare/src/peers"
 )
 
-const MAX_CONCURRENT_PER_MANAGER = 50
+const MAX_CONCURRENT_PER_MANAGER = 10
 const MAX_FAILURES_PER_ORIGIN = 15
 const MAX_RETRIES_PER_CHUNK = 15
 

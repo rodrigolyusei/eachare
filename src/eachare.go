@@ -52,6 +52,7 @@ func check(err error) {
 
 // Função para modo de teste, simulando a execução do programa com argumentos específicos
 func testArgs() *Client {
+	logger.SetLogLevel(logger.ZERO)
 	// Vai testando portas diferentes até encontrar uma livre
 	counter := 0
 	for {
