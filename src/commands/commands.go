@@ -136,6 +136,14 @@ func (fl *FileList) AppendFile(filename string, size int, origin string) {
 	fl.files = append(fl.files, File{filename, size, []string{origin}})
 }
 
+// Estrutura para estatísticas do download
+type Statistic struct {
+	chunckSize int
+	peersQty   int
+	fileSize   int
+	times      []float64
+}
+
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
 	if err != nil {
@@ -250,7 +258,7 @@ func ListLocalFiles(sharedPath string) {
 }
 
 // Função para mensagem LS, solicita para os vizinhos onlines os seus arquivos
-func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, chunkSize int) {
+func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, chunkSize int, statistics *[]Statistic) {
 	// Cria a estrutura da mensagem LS
 	sendMessage := message.BaseMessage{Origin: senderAddress, Clock: 0, Type: message.LS, Arguments: nil}
 
@@ -292,12 +300,12 @@ func LsRequest(knownPeers *peers.SafePeers, senderAddress string, sharedPath str
 	} else if files.Empty() {
 		logger.Std("\nNão havia nenhum arquivo disponível na busca\n")
 	} else {
-		DlMenu(knownPeers, senderAddress, sharedPath, files, chunkSize)
+		DlMenu(knownPeers, senderAddress, sharedPath, files, chunkSize, statistics)
 	}
 }
 
 // Função para mensagem DL, escolhe um arquivo dentre os buscados para baixar
-func DlMenu(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, fileList *FileList, chunkSize int) {
+func DlMenu(knownPeers *peers.SafePeers, senderAddress string, sharedPath string, fileList *FileList, chunkSize int, statistics *[]Statistic) {
 	// Declara variável para o comando e inicia o loop do menu de arquivos
 	var comm string
 	for {
@@ -342,7 +350,7 @@ func DlMenu(knownPeers *peers.SafePeers, senderAddress string, sharedPath string
 		if number == 0 {
 			break
 		} else if number > 0 && number <= fileList.Len() {
-			DlRequest(knownPeers, fileList.files[number-1], senderAddress, sharedPath, chunkSize)
+			DlRequest(knownPeers, fileList.files[number-1], senderAddress, sharedPath, chunkSize, statistics)
 			break
 		} else {
 			logger.Std("\nOpção inválida, tente novamente.\n")
@@ -540,8 +548,10 @@ func rebalanceManager(cfg *OriginManagerConfig, rebalanceWg *sync.WaitGroup) {
 }
 
 // Função para mensagem DL, solicita o download do arquivo escolhido em chunks
-func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int) {
+func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sharedPath string, chunkSize int, statistics *[]Statistic) {
 	logger.Std("\nArquivo escolhido " + file.name + "\n")
+
+	startTime := time.Now()
 
 	// Calcula a quantidade de requisições necessárias e cria o canal de respostas
 	totalRequests := int(math.Ceil(float64(file.size) / float64(chunkSize)))
@@ -622,6 +632,25 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 		receivedHashes[dlResponse.index] = dlResponse.hash
 	}
 
+	// Salva a nova estatística do download
+	finalTime := time.Since(startTime).Seconds()
+	found := false
+	for i, stat := range *statistics {
+		if stat.chunckSize == chunkSize && stat.peersQty == len(file.origin) && stat.fileSize == file.size {
+			(*statistics)[i].times = append((*statistics)[i].times, finalTime)
+			found = true
+			break
+		}
+	}
+	if !found {
+		*statistics = append(*statistics, Statistic{
+			chunckSize: chunkSize,
+			peersQty:   len(file.origin),
+			fileSize:   file.size,
+			times:      []float64{finalTime},
+		})
+	}
+
 	// Decodifica os chunks recebidos e junta
 	var decodedChunks []byte
 	for i, r := range receivedHashes {
@@ -645,6 +674,49 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 	check(err)
 	logger.Std("\nDownload do arquivo " + file.name + " finalizado.\n")
 	logger.Std("\nErros de peer: " + cfg.healthyOrigins.ErrorSummary())
+}
+
+// Função para mostrar as estatísticas do download
+func ShowStatistics(statistics *[]Statistic) {
+	// Encontra os maiores tamanhos de cada coluna
+	biggestChunkSize := len("Tam. chunk")
+	biggestPeersQty := len("N peers")
+	biggestFileSize := len("Tam. arquivo")
+	biggestAttemps := len("N")
+	biggestMeanTime := len("Tempo [s]")
+	for _, stat := range *statistics {
+		if len(strconv.Itoa(stat.chunckSize)) > biggestChunkSize {
+			biggestChunkSize = len(strconv.Itoa(stat.chunckSize))
+		}
+		if len(strconv.Itoa(stat.peersQty)) > biggestPeersQty {
+			biggestPeersQty = len(strconv.Itoa(stat.peersQty))
+		}
+		if len(strconv.Itoa(stat.fileSize)) > biggestFileSize {
+			biggestFileSize = len(strconv.Itoa(stat.fileSize))
+		}
+		if len(strconv.Itoa(len(stat.times))) > biggestAttemps {
+			biggestAttemps = len(strconv.Itoa(len(stat.times)))
+		}
+	}
+
+	// Formata a tabela de estatísticas
+	header := fmt.Sprintf("%%-%ds | %%-%ds | %%-%ds | %%-%ds | %%-%ds | %%s\n", biggestChunkSize, biggestPeersQty, biggestFileSize, biggestAttemps, biggestMeanTime)
+	row := fmt.Sprintf("%%-%ds | %%-%ds | %%-%ds | %%-%ds | %%-%ds | %%s\n", biggestChunkSize, biggestPeersQty, biggestFileSize, biggestAttemps, biggestMeanTime)
+
+	// Imprime a tabela de estatísticas
+	logger.Std(fmt.Sprintf(header, "Tam. chunk", "N peers", "Tam. arquivo", "N", "Tempo [s]", "Desvio"))
+	for _, stat := range *statistics {
+		stdDeviation, meanTime := 0.0, 0.0
+		for _, t := range stat.times {
+			meanTime += t
+		}
+		meanTime /= float64(len(stat.times))
+		for _, t := range stat.times {
+			stdDeviation += (t - meanTime) * (t - meanTime)
+		}
+		stdDeviation = math.Sqrt(stdDeviation / float64(len(stat.times)))
+		logger.Std(fmt.Sprintf(row, strconv.Itoa(stat.chunckSize), strconv.Itoa(stat.peersQty), strconv.Itoa(stat.fileSize), strconv.Itoa(len(stat.times)), fmt.Sprintf("%.5f", meanTime), fmt.Sprintf("%.5f", stdDeviation)))
+	}
 }
 
 // Função para alterar o tamanho do chunk

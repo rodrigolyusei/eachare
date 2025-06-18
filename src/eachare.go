@@ -43,13 +43,6 @@ func NewClient(address string, neighbors string, shared string) Client {
 	}
 }
 
-type Statistic struct {
-	chunckSize int
-	peersQty   int
-	fileSize   int
-	times      []time.Time
-}
-
 // Função para verificar e imprimir mensagem de erro
 func check(err error) {
 	if err != nil {
@@ -141,7 +134,7 @@ func (c *Client) verifySharedDirectory() {
 }
 
 // Função para a CLI/menu de interação com o usuário
-func cliInterface(client *Client, statistics *[]Statistic) {
+func cliInterface(client *Client, statistics *[]commands.Statistic) {
 	// Declara variável para o comando e saída, depois inicia o loop do menu
 	var comm string
 	var exit bool = false
@@ -172,9 +165,9 @@ func cliInterface(client *Client, statistics *[]Statistic) {
 		case "3":
 			commands.ListLocalFiles(client.shared)
 		case "4":
-			commands.LsRequest(client.knownPeers, client.address, client.shared, client.chunkSize)
+			commands.LsRequest(client.knownPeers, client.address, client.shared, client.chunkSize, statistics)
 		case "5":
-			logger.Std("Comando ainda não implementado.\n")
+			commands.ShowStatistics(statistics)
 		case "6":
 			commands.ChangeChunk(&client.chunkSize)
 		case "9":
@@ -266,10 +259,10 @@ func main() {
 		client.verifySharedDirectory()
 	}
 
-	var statistics *[]Statistic
+	var statistics []commands.Statistic
 
 	// Cria uma goroutine/thread para a CLI
-	go cliInterface(client, statistics)
+	go cliInterface(client, &statistics)
 
 	// Inicializa o peer
 	listener(client)
