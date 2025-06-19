@@ -44,3 +44,28 @@ Para gerar o cover dos unit tests, mostrando a taxa de funções tratadas, basta
 go test ./... -coverprofile profile.out
 go tool cover -func profile.out
 ```
+
+## Docker
+Para trabalhar com o docker, é necessário estar na pasta src e siga as etapas.\
+Para subir os conteiners, use
+```
+docker compose up
+```
+Para removê-los,
+```
+docker compose down
+```
+Para entrar dentro do terminal de um docker para executar o programa,
+```
+docker exec -it peer1 /bin/sh
+```
+O número precisa ser o mesmo do docker-compose.
+Depois, para executar a aplicação:
+```
+./peer peer1:9001 /app/neighbor.txt /app/shared
+./peer peer2:9002 /app/neighbor.txt /app/shared
+./peer peer3:9003 /app/neighbor.txt /app/shared
+./peer peer4:9004 /app/neighbor.txt /app/shared
+./peer peer5:9005 /app/neighbor.txt /app/shared
+```
+Atente-se que cada conteiner possui somente aberta a porta 900- de acordo com seu número de peer. Portanto, se tentar executar no conteiner peer2 com o endereço de peer1:9001, não irá funcionar. Para simplificar, siga os comandos em ordem. Recomenda-se abrir um terminal  para cada docker exec.
