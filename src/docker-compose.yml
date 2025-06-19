@@ -1,0 +1,61 @@
+services:
+  peer1:
+    build: .
+    container_name: peer1
+    volumes:
+      - ../data/shared1:/app/shared    # Mount host's shared1 to container's /app/shared
+      - ../data/neighbor1.txt:/app/neighbor.txt # Mount host's neighbor1.txt to container's /app/neighbor.txt
+    # Command to run the peer, listening on 0.0.0.0:9001
+    # Arguments: listen_address, neighbor_file_path, shared_dir_path
+    #command:    # <-- Corrected neighbor.txt path
+    networks: [testnet]
+    ports:
+      - "9001:9001"
+
+  peer2:
+    build: .
+    container_name: peer2
+    volumes:
+      - ../data/shared2:/app/shared
+      - ../data/neighbor2.txt:/app/neighbor.txt
+    #command: ./peer peer2:9002 /app/neighbor.txt /app/shared # <-- Corrected neighbor.txt path
+    networks: [testnet]
+    ports:
+      - "9002:9002"
+
+  peer3:
+    build: .
+    container_name: peer3
+    volumes:
+      - ../data/shared3:/app/shared
+      - ../data/neighbor3.txt:/app/neighbor.txt
+    #command: ./peer peer3:9003 /app/neighbor.txt /app/shared # <-- Corrected neighbor.txt path
+    networks: [testnet]
+    ports:
+      - "9003:9003"
+
+  peer4:
+    build: .
+    container_name: peer4
+    volumes:
+      - ../data/shared4:/app/shared
+      - ../data/neighbor4.txt:/app/neighbor.txt
+    #command: ./peer peer4:9004 /app/neighbor.txt /app/shared # <-- Corrected neighbor.txt path
+    networks: [testnet]
+    ports:
+      - "9004:9004"
+
+  peer5:
+    build: .
+    container_name: peer5
+    volumes:
+      - ../data/shared5:/app/shared
+      - ../data/neighbor5.txt:/app/neighbor.txt # <-- Corrected to neighbor5.txt (assuming it exists)
+    #command: ./peer peer5:9005 /app/neighbor.txt /app/shared # <-- Corrected neighbor.txt path
+    networks: [testnet]
+    ports:
+      - "9005:9005"
+
+networks:
+  testnet:
+    driver: bridge
