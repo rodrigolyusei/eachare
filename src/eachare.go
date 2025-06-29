@@ -251,6 +251,7 @@ func receiver(conn net.Conn, client *Client) {
 func main() {
 	// Cria os valores iniciais do cliente a partir dos argumentos de entrada ou do modo de teste
 	var client *Client
+	logger.SetLogLevel(logger.ERROR)
 	if len(os.Args) == 2 && os.Args[1] == "--test" {
 		client = testArgs()
 	} else {

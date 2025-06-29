@@ -11,6 +11,11 @@ services:
     networks: [testnet]
     ports:
       - "9001:9001"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
+    
 
   peer2:
     build: .
@@ -22,6 +27,10 @@ services:
     networks: [testnet]
     ports:
       - "9002:9002"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
 
   peer3:
     build: .
@@ -33,6 +42,10 @@ services:
     networks: [testnet]
     ports:
       - "9003:9003"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
 
   peer4:
     build: .
@@ -44,6 +57,10 @@ services:
     networks: [testnet]
     ports:
       - "9004:9004"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
 
   peer5:
     build: .
@@ -55,6 +72,10 @@ services:
     networks: [testnet]
     ports:
       - "9005:9005"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
 
 networks:
   testnet:
