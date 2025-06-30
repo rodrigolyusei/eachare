@@ -622,7 +622,7 @@ func DlRequest(knownPeers *peers.SafePeers, file File, senderAddress string, sha
 			count++
 		}
 		end := start + count
-		if start < end {
+		if start <= end {
 			go managers[i].createRequests(start, end)
 		}
 		start = end
