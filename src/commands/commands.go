@@ -10,7 +10,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,7 +50,7 @@ func (h *HealthyOrigins) Remove(originToRemove string) {
 		// remove origin from h.origins
 		for i, origin := range h.origins {
 			if origin == originToRemove {
-				h.origins = slices.Delete(h.origins, i, i+1)
+				h.origins = append(h.origins[:i], h.origins[i+1:]...)
 				return
 			}
 		}
